@@ -15,7 +15,6 @@ from pathology_api.handler import handle_request
 from pathology_api.logging import get_logger
 
 _logger = get_logger(__name__)
-
 app = APIGatewayHttpResolver()
 
 type _ExceptionHandler[T: Exception] = Callable[[T], Response[str]]

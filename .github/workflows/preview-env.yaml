@@ -43,6 +43,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0 # Full history required for accurate sonar analysis.
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
@@ -137,6 +139,8 @@ jobs:
           APIM_APIKEY: ${{ secrets.APIM_APIKEY }}
           API_MTLS_CERT: ${{ secrets.API_MTLS_CERT }}
           API_MTLS_KEY: ${{ secrets.API_MTLS_KEY }}
+          APIM_KEY_ID: ${{ secrets.APIM_KEY_ID }}
+          CLIENT_REQUEST_TIMEOUT: ${{ secrets.CLIENT_REQUEST_TIMEOUT }}
         run: |
           cd pathology-api/target/
           FN="${{ steps.names.outputs.function_name }}"
@@ -146,6 +150,8 @@ jobs:
           API_KEY="${APIM_APIKEY:-/cds/pathology/dev/apim/api-key}"
           MTLS_CERT="${API_MTLS_CERT:-/cds/pathology/dev/mtls/client1-key-public}"
           MTLS_KEY="${API_MTLS_KEY:-/cds/pathology/dev/mtls/client1-key-secret}"
+          KEY_ID="${APIM_KEY_ID:-DEV-1}"
+          CLIENT_TIMEOUT="${CLIENT_REQUEST_TIMEOUT:-10s}"
           echo "Deploying preview function: $FN"
           wait_for_lambda_ready() {
             while true; do
@@ -167,14 +173,18 @@ jobs:
             wait_for_lambda_ready
             aws lambda update-function-configuration --function-name "$FN" \
               --handler "${{ env.LAMBDA_HANDLER }}" \
+              --memory-size 512 \
+              --timeout 30 \
               --environment "Variables={APIM_TOKEN_EXPIRY_THRESHOLD=$EXPIRY_THRESHOLD, \
                                         APIM_PRIVATE_KEY_NAME=$PRIVATE_KEY, \
                                         APIM_API_KEY_NAME=$API_KEY, \
                                         APIM_MTLS_CERT_NAME=$MTLS_CERT, \
                                         APIM_MTLS_KEY_NAME=$MTLS_KEY, \
-                                        APIM_TOKEN_URL=$MOCK_URL/apim, \
-                                        PDM_BUNDLE_URL=$MOCK_URL/pdm, \
+                                        APIM_KEY_ID=$KEY_ID, \
+                                        APIM_TOKEN_URL=$MOCK_URL/apim/oauth2/token, \
+                                        PDM_BUNDLE_URL=$MOCK_URL/apim/check_auth, \
                                         MNS_EVENT_URL=$MOCK_URL/mns, \
+                                        CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
                                         JWKS_SECRET_NAME=$JWKS_SECRET}" || true
             wait_for_lambda_ready
             aws lambda update-function-code --function-name "$FN" \
@@ -186,14 +196,18 @@ jobs:
               --handler "${{ env.LAMBDA_HANDLER }}" \
               --zip-file "fileb://artifact.zip" \
               --role "${{ steps.role-select.outputs.lambda_role }}" \
+              --memory-size 512 \
+              --timeout 30 \
               --environment "Variables={APIM_TOKEN_EXPIRY_THRESHOLD=$EXPIRY_THRESHOLD, \
                                         APIM_PRIVATE_KEY_NAME=$PRIVATE_KEY, \
                                         APIM_API_KEY_NAME=$API_KEY, \
+                                        APIM_KEY_ID=$KEY_ID, \
                                         APIM_MTLS_CERT_NAME=$MTLS_CERT, \
                                         APIM_MTLS_KEY_NAME=$MTLS_KEY, \
-                                        APIM_TOKEN_URL=$MOCK_URL/apim, \
-                                        PDM_BUNDLE_URL=$MOCK_URL/pdm, \
+                                        APIM_TOKEN_URL=$MOCK_URL/apim/oauth2/token, \
+                                        PDM_BUNDLE_URL=$MOCK_URL/apim/check_auth, \
                                         MNS_EVENT_URL=$MOCK_URL/mns, \
+                                        CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
                                         JWKS_SECRET_NAME=$JWKS_SECRET}" \
               --publish
             wait_for_lambda_ready
