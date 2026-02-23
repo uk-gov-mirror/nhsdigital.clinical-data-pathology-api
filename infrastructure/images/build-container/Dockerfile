@@ -133,6 +133,7 @@ ENV PATH="$PIPX_BIN_DIR:$PATH"
 
 # Create a virtual environment for development
 RUN bash -c "source ~/.bashrc && pyenv virtualenv ${PYTHON_VERSION} pathology" \
+    && bash -c "source ~/.bashrc && pyenv virtualenv ${PYTHON_VERSION} pathology-mocks" \
     # Install markdownlint-cli
     && npm install -g --ignore-scripts markdownlint-cli \
     && export PATH \
