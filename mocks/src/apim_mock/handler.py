@@ -4,29 +4,38 @@ import re
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
-from typing import Any, TypedDict
+from typing import Any
+from urllib.parse import parse_qs
 
-import boto3
 import jwt
-
-from apim_mock.logging import get_logger
-
-_logger = get_logger(__name__)
+import requests
+from aws_lambda_powertools.event_handler import (
+    Response,
+)
+from aws_lambda_powertools.event_handler.router import APIGatewayHttpRouter
+from common.logging import get_logger
+from common.storage_helper import BaseMockItem, StorageHelper
+from requests import HTTPError
 
 JWT_ALGORITHMS = ["RS512"]
+REQUESTS_TIMEOUT = 5
+DEFAULT_TOKEN_LIFETIME = 599
+
 AUTH_URL = os.environ["AUTH_URL"]
 PUBLIC_KEY_URL = os.environ["PUBLIC_KEY_URL"]
 API_KEY = os.environ["API_KEY"]
 TOKEN_TABLE_NAME = os.environ["TOKEN_TABLE_NAME"]
 BRANCH_NAME = os.environ["DDB_INDEX_TAG"]
 
+# Constructor for APIGatewayHttpRouter leads to untyped code.
+apim_routes = APIGatewayHttpRouter()  # type: ignore
+storage_helper = StorageHelper(TOKEN_TABLE_NAME, BRANCH_NAME)
 
-class TokenItem(TypedDict):
+_logger = get_logger(__name__)
+
+
+class TokenItem(BaseMockItem):
     access_token: str
-    expiresAt: int
-    ddb_index: str
-    sessionId: str
-    type: str
 
 
 def handle_request(payload: dict[str, Any]) -> dict[str, Any]:
@@ -38,7 +47,7 @@ def handle_request(payload: dict[str, Any]) -> dict[str, Any]:
     unverified_headers = _get_jwt_headers(client_assertion)
     kid = unverified_headers.get("kid", "")
 
-    public_key = _get_jwk_key_from_url_by_kid(kid)
+    public_key = _get_jwk_key_by_kid(kid)
 
     assertions = jwt.decode(
         client_assertion,
@@ -50,11 +59,11 @@ def handle_request(payload: dict[str, Any]) -> dict[str, Any]:
     _validate_assertions(assertions)
 
     token = _generate_random_token()
+    current_time = int(datetime.now(tz=timezone.utc).timestamp())
 
     item: TokenItem = {
         "access_token": token,
-        "expiresAt": int(datetime.now(tz=timezone.utc).timestamp()) + 599,
-        "ddb_index": BRANCH_NAME,
+        "expiresAt": current_time + DEFAULT_TOKEN_LIFETIME,
         "sessionId": token,
         "type": "access_token",
     }
@@ -105,28 +114,20 @@ def _get_jwt_headers(client_assertion: str) -> dict[str, Any]:
     return unverified_headers
 
 
-def _get_jwk_key_from_url_by_kid(kid: str) -> Any:
+def _get_jwk_keys_from_public_url() -> Any:
+    _logger.debug("Retrieving keys from url")
 
-    # TODO - once we have our endpoint setup we can query it here
-    # _logger.debug("Retrieving keys from url", unverified_headers)
-    # with urllib.requests.urlopen(PUBLIC_KEY_URL) as resp:
-    #     resp_body = resp.read()
-    resp_body = """
-    {
-        "keys": [
-            {
-                "kty": "RSA",
-                "n": "uCqVUiCd8EAkTaii5tUl0rRu0_u5DKPTseoz9qIsNwNl2iuLOLW_bFy29Oi1JC4V-C8q3KFshygnay7UDXAddlZ6h6V6VoBFLcgjx9kolCP0gNcY8WW9B071tfsjOK_rWS4aOS_jRZA9_SFLX9JM7OtE0dvWfBaKwMIFuj3g4GNfBmla5JfM_6zBw7KuKijTwf0Jjqc11PtbbEEJZLpoXSlJx6tXRHMFHY_XUr3AOMnnpxVhJAat-3Q-ORkTysjj0FS1QdW1Zh93jmoflAFnTosHYvoKU_UQz9t4IKpHg9CIgHjbi21Q-qJZztwLnFH-t4EjNtPEZdma0oR1jWSgKuFkOPgQPyRG5FPQ4bMYmO9RiVl1zZSsuC6eppXsrsW6ZXVDP7TY2KCT2N4SoAK9dMw7Qi3repvjtua6Cny-eZs01YxSygaobIZ6DB0Xu3bAzD0NMNfihBCTAoXBkqCRjKTlnJxOMiS5Sk8HAmZ_unUC_4HAQu7NY_dU8GG5gtGbcuqTZSZyX_ETkfyo9IwFBaiBw8sKEzZ0e_vvhnmlMmn63WtRGVtc2qb7TI6wpVoTlhbY05iF2xAFaeGFTf4_esj63-5DlaCPB8Mf53wIdiifC0l3t4siOT-CZE82Fl7SQ0K-fCBBQOmTXd8QwBzwMlFbtubfvm20J-jFkXOTQ50",
-                "e": "AQAB",
-                "alg": "RS512",
-                "kid": "DEV-1",
-                "use": "sig"
-            }
-        ]
-    }
-    """  # noqa: E501
+    response = requests.get(PUBLIC_KEY_URL, timeout=REQUESTS_TIMEOUT)
+    response.raise_for_status()
 
-    keys = json.loads(resp_body).get("keys", [])
+    response_body = response.json()
+
+    return response_body["keys"]
+
+
+def _get_jwk_key_by_kid(kid: str) -> Any:
+
+    keys = _get_jwk_keys_from_public_url()
 
     jwk_key: dict[str, Any] = next((key for key in keys if key.get("kid") == kid), {})
 
@@ -143,17 +144,12 @@ def _get_jwk_key_from_url_by_kid(kid: str) -> Any:
 
 
 def _validate_assertions(assertions: dict[str, Any]) -> None:
-    expected_api_key = API_KEY
-
     if not assertions.get("iss") or not assertions.get("sub"):
         raise ValueError(
             "Missing or non-matching 'iss'/'sub' claims in client_assertion JWT"
         )
 
-    if (
-        assertions.get("iss") != expected_api_key
-        or assertions.get("sub") != expected_api_key
-    ):
+    if assertions.get("iss") != API_KEY or assertions.get("sub") != API_KEY:
         raise ValueError("Invalid 'iss'/'sub' claims in client_assertion JWT")
 
     jti = assertions.get("jti", "")
@@ -192,6 +188,57 @@ def _generate_random_token() -> str:
 
 
 def _write_token_to_table(item: TokenItem) -> None:
-    dynamodb = boto3.resource("dynamodb")
-    table = dynamodb.Table(TOKEN_TABLE_NAME)
-    table.put_item(Item=item)
+    storage_helper.put_item(item)
+
+
+##### APIM Mock Routing
+def _with_default_headers(status_code: int, body: str) -> Response[str]:
+    return Response(
+        status_code=status_code,
+        headers={"Content-Type": "application/json"},
+        body=body,
+    )
+
+
+@apim_routes.post("/apim/oauth2/token")
+def post_auth() -> Response[str]:
+    _logger.debug("Authentication Mock called")
+
+    payload = apim_routes.current_event.decoded_body
+
+    if not payload:
+        _logger.error("No payload provided.")
+        return Response(status_code=400, body="Bad Request")
+
+    parsed_payload: dict[str, Any] = parse_qs(payload)
+
+    _logger.debug("Payload received %s", parsed_payload)
+
+    try:
+        response = handle_request(parsed_payload)
+    except jwt.InvalidTokenError as err:
+        _logger.error("expected exception %s", err)
+        _logger.error("Type %s", type(err))
+        error_body = {"error": "invalid_request", "error_description": str(err)}
+        return _with_default_headers(status_code=400, body=json.dumps(error_body))
+    except ValueError as err:
+        _logger.error("expected exception %s", err)
+        error_body = {"error": "invalid_request", "error_description": str(err)}
+        return _with_default_headers(status_code=400, body=json.dumps(error_body))
+    except HTTPError as err:
+        _logger.error("HTTP error occurred: %s", err)
+        error_body = {
+            "error": "public_key error",
+            "error_description": "The JWKS endpoint, for your"
+            " client_assertion can't be reached",
+        }
+        return _with_default_headers(status_code=403, body=json.dumps(error_body))
+    except Exception as err:
+        _logger.error("unexpected exception %s", err)
+        _logger.error("Type %s", type(err))
+        return _with_default_headers(status_code=500, body="Internal Server Error")
+
+    return _with_default_headers(
+        status_code=200,
+        body=json.dumps(response),
+    )

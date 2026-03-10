@@ -1,20 +1,24 @@
 import json
-import logging
+from collections.abc import Callable
 from typing import Any
-from urllib.parse import parse_qs
 
-from apim_mock.auth_check import check_authenticated
-from apim_mock.handler import handle_request as handle_apim_request
+from apim_mock.auth_check import AuthenticationError
+from apim_mock.handler import apim_routes
 from aws_lambda_powertools.event_handler import (
     APIGatewayHttpResolver,
     Response,
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from jwt.exceptions import InvalidTokenError
+from common.logging import get_logger
+from pdm_mock.handler import pdm_routes
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 app = APIGatewayHttpResolver()
+app.include_router(apim_routes)
+app.include_router(pdm_routes)
+
+type _ExceptionHandler[T: Exception] = Callable[[T], Response[str]]
 
 
 def _with_default_headers(status_code: int, body: str) -> Response[str]:
@@ -23,6 +27,41 @@ def _with_default_headers(status_code: int, body: str) -> Response[str]:
         headers={"Content-Type": "application/json"},
         body=body,
     )
+
+
+###### Exception Handlers ######
+
+
+def _exception_handler[T: Exception](
+    exception_type: type[T],
+) -> Callable[[_ExceptionHandler[T]], _ExceptionHandler[T]]:
+    """
+    Exception handler decorator that registers a function as an exception handler
+    with the created app whilst maintaining type information.
+    """
+
+    def decorator(func: _ExceptionHandler[T]) -> _ExceptionHandler[T]:
+        def wrapper(exception: T) -> Response[str]:
+            return func(exception)
+
+        app.exception_handler(exception_type)(wrapper)
+        return wrapper
+
+    return decorator
+
+
+@_exception_handler(AuthenticationError)
+def handle_authentication_error(_exception: AuthenticationError) -> Response[str]:
+    # LOG014: False positive, we are within an exception handler here.
+    _logger.info(
+        "Authentication failed: %s",
+        _exception,
+        exc_info=True,  # noqa: LOG014
+    )
+    return _with_default_headers(401, "")
+
+
+###### Health Checks ######
 
 
 @app.get("/_status")
@@ -61,56 +100,7 @@ def root() -> Response[str]:
     return _with_default_headers(200, body=json.dumps(response_body, indent=2))
 
 
-@app.post("/apim/oauth2/token")
-def post_auth() -> Response[str]:
-    _logger.debug("Authentication Mock called")
-
-    payload = app.current_event.decoded_body
-
-    if not payload:
-        _logger.error("No payload provided.")
-        return Response(status_code=400, body="Bad Request")
-
-    parsed_payload: dict[str, Any] = parse_qs(payload)
-
-    _logger.debug("Payload received %s", parsed_payload)
-
-    try:
-        response = handle_apim_request(parsed_payload)
-    except InvalidTokenError as err:
-        _logger.error("expected exception %s", err)
-        _logger.error("Type %s", type(err))
-        error_body = {"error": "invalid_request", "error_description": str(err)}
-        return _with_default_headers(status_code=400, body=json.dumps(error_body))
-    except ValueError as err:
-        _logger.error("expected exception %s", err)
-        error_body = {"error": "invalid_request", "error_description": str(err)}
-        return _with_default_headers(status_code=400, body=json.dumps(error_body))
-    except Exception as err:
-        _logger.error("unexpected exception %s", err)
-        _logger.error("Type %s", type(err))
-        return _with_default_headers(status_code=500, body="Internal Server Error")
-
-    return _with_default_headers(
-        status_code=200,
-        body=json.dumps(response),
-    )
-
-
-@app.route("/apim/check_auth", method=["POST", "GET"])
-def check_auth() -> Response[str]:
-    headers = app.current_event.headers
-
-    token = headers.get("Authorization", "").replace("Bearer ", "")
-
-    if check_authenticated(token):
-        return _with_default_headers(
-            status_code=200, body=json.dumps({"message": "ok"})
-        )
-    else:
-        return _with_default_headers(
-            status_code=401, body=json.dumps({"message": "Unauthorized"})
-        )
+##########
 
 
 def handler(data: dict[str, Any], context: LambdaContext) -> dict[str, Any]:

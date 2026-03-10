@@ -1,22 +1,31 @@
 import os
-from time import time
+from typing import Any
 
-import boto3
-from boto3.dynamodb.conditions import Attr, Key
+from boto3.dynamodb.conditions import Attr
+from common.storage_helper import StorageHelper
 
+JWT_ALGORITHMS = ["RS512"]
+REQUESTS_TIMEOUT = 5
+DEFAULT_TOKEN_LIFETIME = 599
+
+AUTH_URL = os.environ["AUTH_URL"]
+PUBLIC_KEY_URL = os.environ["PUBLIC_KEY_URL"]
+API_KEY = os.environ["API_KEY"]
 TOKEN_TABLE_NAME = os.environ["TOKEN_TABLE_NAME"]
 BRANCH_NAME = os.environ["DDB_INDEX_TAG"]
 
+storage_helper = StorageHelper(TOKEN_TABLE_NAME, BRANCH_NAME)
 
-def check_authenticated(token: str) -> bool:
-    dynamodb = boto3.resource("dynamodb")
-    table = dynamodb.Table(TOKEN_TABLE_NAME)
 
-    query_result = table.query(
-        IndexName="ddb_index",
-        KeyConditionExpression=Key("ddb_index").eq(BRANCH_NAME),
-        FilterExpression=Attr("access_token").eq(token)
-        & Attr("expiresAt").gt(int(time())),
-    )
+class AuthenticationError(Exception):
+    pass
 
-    return len(query_result["Items"]) > 0
+
+def check_authenticated(request_headers: dict[str, Any]) -> None:
+    auth_token = request_headers.get("Authorization", "").replace("Bearer ", "")
+
+    filter_expression = Attr("access_token").eq(auth_token)
+    query_result = storage_helper.find_items(filter_expression)
+
+    if len(query_result) == 0:
+        raise AuthenticationError("Token is not valid or has expired")

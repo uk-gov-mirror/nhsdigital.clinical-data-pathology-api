@@ -325,8 +325,8 @@ jobs:
           TOKEN_EXPIRY_TIME: ${{ secrets.TOKEN_LIFETIME }}
           AUTH_URL: "${{ steps.names.outputs.mock_preview_url }}/apim/oauth2/token"
           JWKS_SECRET: ${{ env._cds_pathology_dev_jwks_secret }}
-          PUBLIC_KEY_URL: "https://example.com"
-          TOKEN_TABLE_NAME: "mock_services_dev"
+          PUBLIC_KEY_URL: "https://pki.dev.endpoints.pathology-laboratory-reporting.national.nhs.uk/pathology.jwks"
+          DYNAMODB_TABLE_NAME: "mock_services_dev"
         run: |
           cd mocks/target/
           MFN="${{ steps.names.outputs.mock_function_name }}"
@@ -357,7 +357,8 @@ jobs:
                                         AUTH_URL=$AUTH_URL, \
                                         PUBLIC_KEY_URL=$PUBLIC_KEY_URL, \
                                         API_KEY=$JWKS_SECRET, \
-                                        TOKEN_TABLE_NAME=$TOKEN_TABLE_NAME \
+                                        TOKEN_TABLE_NAME=$DYNAMODB_TABLE_NAME, \
+                                        PDM_TABLE_NAME=$DYNAMODB_TABLE_NAME \
                                         }" || true
             wait_for_lambda_ready
             aws lambda update-function-code --function-name "$MFN" --zip-file "fileb://artifact.zip" --publish
@@ -373,7 +374,8 @@ jobs:
                                         AUTH_URL=$AUTH_URL, \
                                         PUBLIC_KEY_URL=$PUBLIC_KEY_URL, \
                                         API_KEY=$JWKS_SECRET, \
-                                        TOKEN_TABLE_NAME=$TOKEN_TABLE_NAME, \
+                                        TOKEN_TABLE_NAME=$DYNAMODB_TABLE_NAME, \
+                                        PDM_TABLE_NAME=$DYNAMODB_TABLE_NAME \
                                         }" \
               --publish
             wait_for_lambda_ready
