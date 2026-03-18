@@ -1,0 +1,95 @@
+name: "Update Sonar Statistics"
+
+on:
+  push:
+    branches:
+      - "main"
+
+env:
+  PYTHON_VERSION: 3.14
+
+jobs:
+  run-tests:
+    name: "Run Tests"
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+
+      - name: Setup Python project
+        uses: ./.github/actions/setup-python-project
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: "Create coverage artefact name"
+        id: create-name
+        uses: ./.github/actions/create-artefact-name
+        with:
+          prefix: coverage
+
+      - name: "Run unit tests"
+        uses: ./.github/actions/run-test-suite
+        with:
+          test-type: unit
+          env: local
+
+      - name: "Download all test coverage artefacts"
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          path: pathology-api/test-artefacts/
+          merge-multiple: false
+
+      - name: "Build coverage XML report"
+        run: |
+          cd pathology-api/test-artefacts
+          mkdir unit-test-results
+          mv coverage.unit unit-test-results/coverage.unit
+
+          cd ../..
+
+          COVERAGE_UNIT_ONLY=true make test-coverage
+          cd pathology-api/test-artefacts
+          mv coverage-merged.xml "${{ steps.create-name.outputs.artefact-name }}.xml"
+
+      - name: "Upload combined coverage report"
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ${{ steps.create-name.outputs.artefact-name }}
+          path: pathology-api/test-artefacts
+          retention-days: 30
+
+  sonarcloud-analysis:
+    name: "SonarCloud Analysis"
+    needs: run-tests
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # Fetch all history for accurate SonarCloud analysis
+
+      - name: "Download merged coverage report"
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: ${{ steps.create-name.outputs.artefact-name }}
+          path: coverage-reports/
+
+      - name: "SonarCloud Scan"
+        uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9 #7.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=${{ vars.SONAR_ORGANISATION_KEY }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.python.coverage.reportPaths=coverage-reports/${{ steps.create-name.outputs.artefact-name }}.xml
+

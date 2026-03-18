@@ -6,10 +6,12 @@ set -e
 cd pathology-api/test-artefacts
 # Rename files to .coverage.* format that coverage combine expects
 mv unit-test-results/coverage.unit .coverage.unit
-mv contract-test-results/coverage.contract .coverage.contract
-mv schema-test-results/coverage.schema .coverage.schema
-mv integration-test-results/coverage.integration .coverage.integration
-mv acceptance-test-results/coverage.acceptance .coverage.acceptance
+if [[ "${UNIT_TESTS_ONLY}" != "true" ]]; then
+  mv contract-test-results/coverage.contract .coverage.contract
+  mv schema-test-results/coverage.schema .coverage.schema
+  mv integration-test-results/coverage.integration .coverage.integration
+  mv acceptance-test-results/coverage.acceptance .coverage.acceptance
+fi
 # Go back to project root for coverage operations
 cd ..
 poetry run coverage combine test-artefacts

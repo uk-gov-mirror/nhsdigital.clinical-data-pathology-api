@@ -495,7 +495,7 @@ jobs:
           name: ${{ steps.create-name.outputs.artefact-name }}
           path: coverage-reports/
       - name: "SonarCloud Scan"
-        if: always() && github.event.action != 'closed'
+        if: always() && github.event.action != 'closed' && github.actor != 'dependabot[bot]'
         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9 #7.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
