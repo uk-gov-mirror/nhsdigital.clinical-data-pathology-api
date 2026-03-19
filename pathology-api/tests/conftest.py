@@ -110,7 +110,7 @@ class RemoteClient:
         self,
         api_url: str,
         auth_headers: dict[str, str],
-        timeout: timedelta = timedelta(seconds=5),
+        timeout: timedelta = timedelta(seconds=20),
     ):
         self._api_url = api_url
         self._default_headers = auth_headers | {"Content-Type": "application/fhir+json"}

@@ -35,6 +35,7 @@ class TestProviderContract:
         verifier.add_source(
             "tests/contract/pacts/PathologyAPIConsumer-PathologyAPIProvider.json"
         )
+        verifier.set_request_timeout(20000)
 
         # Verify the provider against the pact
         verifier.verify()

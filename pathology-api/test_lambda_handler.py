@@ -1,12 +1,24 @@
+import os
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pydantic
 import pytest
+
+os.environ["CLIENT_TIMEOUT"] = "1s"
+os.environ["APIM_TOKEN_URL"] = "apim_url"  # noqa S105 - dummy value
+os.environ["APIM_PRIVATE_KEY_NAME"] = "apim_private_key_name"
+os.environ["APIM_API_KEY_NAME"] = "apim_api_key_name"
+os.environ["APIM_TOKEN_EXPIRY_THRESHOLD"] = "1s"  # noqa S105 - dummy value
+os.environ["APIM_KEY_ID"] = "apim_key"
+os.environ["PDM_BUNDLE_URL"] = "pdm_bundle_url"
+
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from lambda_handler import handler
+
+with patch("aws_lambda_powertools.utilities.parameters.get_secret") as get_secret_mock:
+    from lambda_handler import handler
 from pathology_api.exception import ValidationError
-from pathology_api.fhir.r4.elements import LogicalReference, PatientIdentifier
+from pathology_api.fhir.r4.elements import LogicalReference, Meta, PatientIdentifier
 from pathology_api.fhir.r4.resources import Bundle, Composition, OperationOutcome
 
 
@@ -40,7 +52,8 @@ class TestHandler:
         returned_issue = response_outcome.issue[0]
         return returned_issue
 
-    def test_create_test_result_success(self) -> None:
+    @patch("lambda_handler.handle_request")
+    def test_create_test_result_success(self, handle_request_mock: MagicMock) -> None:
         bundle = Bundle.create(
             type="document",
             entry=[
@@ -54,6 +67,15 @@ class TestHandler:
                 )
             ],
         )
+
+        expected_response = Bundle.create(
+            id="test-id",
+            type="document",
+            meta=Meta.with_last_updated(),
+            entry=bundle.entries,
+        )
+        handle_request_mock.return_value = expected_response
+
         event = self._create_test_event(
             body=bundle.model_dump_json(by_alias=True),
             path_params="FHIR/R4/Bundle",
@@ -70,11 +92,7 @@ class TestHandler:
         assert isinstance(response_body, str)
 
         response_bundle = Bundle.model_validate_json(response_body, by_alias=True)
-        assert response_bundle.bundle_type == bundle.bundle_type
-        assert response_bundle.entries == bundle.entries
-
-        # A UUID value so can only check its presence.
-        assert response_bundle.id is not None
+        assert response_bundle == expected_response
 
     def test_create_test_result_no_payload(self) -> None:
         event = self._create_test_event(

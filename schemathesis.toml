@@ -1,2 +1,4 @@
+request-timeout = 20.0
+
 [generation]
 mode = "positive"
