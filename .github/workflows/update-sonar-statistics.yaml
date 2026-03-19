@@ -97,5 +97,5 @@ jobs:
           args: >
             -Dsonar.organization=${{ vars.SONAR_ORGANISATION_KEY }}
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
-            -Dsonar.python.coverage.reportPaths=coverage-reports/${{ steps.create-name.outputs.artefact-name }}.xml
+            -Dsonar.python.coverage.reportPaths=coverage-reports/${{ steps.create-name.outputs.artefact-name }}/${{ steps.create-name.outputs.artefact-name }}.xml
 
