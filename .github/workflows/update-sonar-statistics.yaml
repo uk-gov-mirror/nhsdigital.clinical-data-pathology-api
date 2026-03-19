@@ -83,6 +83,12 @@ jobs:
           name: ${{ steps.create-name.outputs.artefact-name }}
           path: coverage-reports/
 
+      - name: "Create coverage artefact name"
+        id: create-name
+        uses: ./.github/actions/create-artefact-name
+        with:
+          prefix: coverage
+
       - name: "SonarCloud Scan"
         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9 #7.0.0
         env:
