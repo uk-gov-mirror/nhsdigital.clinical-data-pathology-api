@@ -1,3 +1,4 @@
+import os
 from logging.config import dictConfig
 
 import requests
@@ -25,7 +26,13 @@ dictConfig(
 )
 
 app = Flask(__name__)  # NOSONAR python:S4502
-cors = CORS(app, resources={r"/*": {"origins": "http://localhost:5002"}})
+TARGET_CONTAINER = os.environ.get("TARGET_CONTAINER")
+TARGET_URL = os.environ.get("TARGET_URL")
+
+if TARGET_CONTAINER == "PATHOLOGY_API":
+    cors = CORS(app, resources={r"/*": {"origins": "http://localhost:5002"}})
+else:
+    cors = CORS(app, resources={r"/*": {"origins": "http://localhost:5005"}})
 
 
 @app.route(  # NOSONAR python:S3752
@@ -35,11 +42,9 @@ cors = CORS(app, resources={r"/*": {"origins": "http://localhost:5002"}})
 )
 @app.route("/<path:path_params>", methods=["POST", "GET"])
 def forward_request(path_params):
-    app.logger.info("received request with data: %s", request.get_data(as_text=True))
 
     response = requests.post(
-        "http://pathology-api:8080/2015-03-31"  # NOSONAR python:S5332
-        "/functions/function/invocations",
+        f"{TARGET_URL}/2015-03-31/functions/function/invocations",
         json={
             "body": request.get_data(as_text=True).replace("\n", "").replace(" ", ""),
             "requestContext": {

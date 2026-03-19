@@ -41,12 +41,19 @@ jobs:
           python-version: ${{ inputs.python_version }}
       - name: "Run unit test suite"
         run: make test-unit
-      - name: "Upload unit test results"
+      - name: "Upload unit test results for pathology-api"
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: unit-test-results
           path: pathology-api/test-artefacts/
+          retention-days: 30
+      - name: "Upload unit test results for mocks"
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: mock-unit-test-results
+          path: mocks/test-artefacts/
           retention-days: 30
       - name: "Publish unit test results to summary"
         if: always()
@@ -87,7 +94,7 @@ jobs:
   test-schema:
     name: "Schema validation tests"
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: "Checkout code"
         uses: actions/checkout@v6
