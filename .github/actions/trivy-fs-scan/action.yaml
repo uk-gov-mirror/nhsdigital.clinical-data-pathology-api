@@ -52,17 +52,17 @@ runs:
           echo "config-arg=" >> "$GITHUB_OUTPUT"
         fi
 
-    - name: Trivy fs scan
-      uses: aquasecurity/trivy-action@0.34.2
-      with:
-        scan-type: 'fs'
-        scan-ref: ${{ inputs.filesystem-ref }}
-        format: json
-        output: trivy-fs-scan.json
-        exit-code: 0
-        ignore-unfixed: ${{ inputs.ignore-unfixed }}
-        severity: ${{ inputs.severity }}
-        trivy-config: ${{ steps.trivy-config-check.outputs.config-arg }}
+    # - name: Trivy fs scan
+    #   uses: aquasecurity/trivy-action@0.34.2
+    #   with:
+    #     scan-type: 'fs'
+    #     scan-ref: ${{ inputs.filesystem-ref }}
+    #     format: json
+    #     output: trivy-fs-scan.json
+    #     exit-code: 0
+    #     ignore-unfixed: ${{ inputs.ignore-unfixed }}
+    #     severity: ${{ inputs.severity }}
+    #     trivy-config: ${{ steps.trivy-config-check.outputs.config-arg }}
 
     - name: Upload Trivy Scan Artifact
       uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0

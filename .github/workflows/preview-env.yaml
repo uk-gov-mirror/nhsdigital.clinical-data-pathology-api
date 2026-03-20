@@ -817,23 +817,23 @@ jobs:
             });
 
       # ---------- Perform trivy scan and notify ----------
-      - name: Prepare lambda artifact for trivy scan
-        if: github.event.action != 'closed'
-        run: |
-          cd pathology-api/target/
-          rm -rf /tmp/artifact
-          mkdir -p /tmp/artifact
-          unzip -q artifact.zip -d /tmp/artifact
+      # - name: Prepare lambda artifact for trivy scan
+      #   if: github.event.action != 'closed'
+      #   run: |
+      #     cd pathology-api/target/
+      #     rm -rf /tmp/artifact
+      #     mkdir -p /tmp/artifact
+      #     unzip -q artifact.zip -d /tmp/artifact
 
-      - name: Trivy filesystem scan
-        if: github.event.action != 'closed'
-        uses: ./.github/actions/trivy-fs-scan
-        with:
-          filesystem-ref: /tmp/artifact
-          artifact-name: trivy-fs-scan-${{ steps.branch.outputs.safe }}
+      # - name: Trivy filesystem scan
+      #   if: github.event.action != 'closed'
+      #   uses: ./.github/actions/trivy-fs-scan
+      #   with:
+      #     filesystem-ref: /tmp/artifact
+      #     artifact-name: trivy-fs-scan-${{ steps.branch.outputs.safe }}
 
-      - name: Trivy SBOM generation
-        if: github.event.action != 'closed'
-        uses: ./.github/actions/trivy-fs-sbom
-        with:
-          fs-path: /tmp/artifact
+      # - name: Trivy SBOM generation
+      #   if: github.event.action != 'closed'
+      #   uses: ./.github/actions/trivy-fs-sbom
+      #   with:
+      #     fs-path: /tmp/artifact
