@@ -42,11 +42,15 @@ else:
 )
 @app.route("/<path:path_params>", methods=["POST", "GET"])
 def forward_request(path_params):
+    x_correlation_id = request.headers.get("X-Correlation-ID")
+    forwarded_headers = {k.lower(): v for k, v in request.headers.items()}
+    forwarded_headers["nhsd-correlation-id"] = x_correlation_id
 
     response = requests.post(
         f"{TARGET_URL}/2015-03-31/functions/function/invocations",
         json={
             "body": request.get_data(as_text=True).replace("\n", "").replace(" ", ""),
+            "headers": forwarded_headers,
             "requestContext": {
                 "http": {
                     "path": f"/{path_params}",

@@ -19,7 +19,7 @@ def step_api_is_running(client: Client) -> None:
     response = client.send_without_payload(path="_status", request_method="GET")
 
     assert response.status_code == 200
-    assert response.json()["checks"]["healthcheck"]["outcome"] == "OK"
+    assert response.json()["checks"]["healthcheck"]["responseCode"] == 200
 
 
 @when("I send a valid Bundle to the Pathology API")

@@ -13,8 +13,10 @@ from pathology_api.exception import ValidationError
 from pathology_api.fhir.r4.resources import Bundle, OperationOutcome
 from pathology_api.handler import handle_request
 from pathology_api.logging import get_logger
+from pathology_api.request_context import reset_correlation_id, set_correlation_id
 
 _logger = get_logger(__name__)
+_CORRELATION_ID_HEADER = "nhsd-correlation-id"
 app = APIGatewayHttpResolver()
 
 type _ExceptionHandler[T: Exception] = Callable[[T], Response[str]]
@@ -84,6 +86,20 @@ def handle_pydantic_validation_error(
     )
 
 
+@_exception_handler(ValueError)
+def handle_value_error(exception: ValueError) -> Response[str]:
+    # LOG014: False positive, we are within an exception handler here.
+    _logger.info(
+        "ValueError encountered: %s",
+        exception,
+        exc_info=True,  # noqa: LOG014
+    )
+    return _with_default_headers(
+        status_code=500,
+        body=OperationOutcome.create_server_error(str(exception)),
+    )
+
+
 @_exception_handler(Exception)
 def handle_exception(exception: Exception) -> Response[str]:
     _logger.exception("Unhandled Exception encountered: %s", exception)
@@ -98,11 +114,21 @@ def handle_exception(exception: Exception) -> Response[str]:
 @app.get("/_status")
 def status() -> Response[str]:
     _logger.debug("Status check endpoint called")
-    return Response(status_code=200, body="OK", headers={"Content-Type": "text/plain"})
+    return Response(
+        status_code=200,
+        body='{"status": "pass"}',
+        headers={"Content-Type": "application/json"},
+    )
 
 
 @app.post("/FHIR/R4/Bundle")
 def post_result() -> Response[str]:
+    correlation_id = app.current_event.headers.get(_CORRELATION_ID_HEADER)
+
+    if not correlation_id:
+        raise ValueError(f"Missing required header: {_CORRELATION_ID_HEADER}")
+
+    set_correlation_id(correlation_id)
     _logger.debug("Post result endpoint called.")
 
     try:
@@ -128,4 +154,7 @@ def post_result() -> Response[str]:
 
 
 def handler(data: dict[str, Any], context: LambdaContext) -> dict[str, Any]:
-    return app.resolve(data, context)
+    try:
+        return app.resolve(data, context)
+    finally:
+        reset_correlation_id()

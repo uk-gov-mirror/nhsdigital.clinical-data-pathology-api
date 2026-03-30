@@ -17,7 +17,11 @@ class Client(Protocol):
     """Protocol defining the interface for HTTP clients."""
 
     def send(
-        self, data: str, path: str, request_method: _RequestMethod
+        self,
+        data: str,
+        path: str,
+        request_method: _RequestMethod,
+        headers: dict[str, str] | None = None,
     ) -> requests.Response:
         """
         Send a request to the APIs with some given parameters.
@@ -31,7 +35,10 @@ class Client(Protocol):
         ...
 
     def send_without_payload(
-        self, path: str, request_method: _RequestMethod
+        self,
+        path: str,
+        request_method: _RequestMethod,
+        headers: dict[str, str] | None = None,
     ) -> requests.Response:
         """
         Send a request to the APIs without a payload.
@@ -47,24 +54,47 @@ class Client(Protocol):
 class LocalClient:
     """HTTP client that sends requests to the Lambda via the RIE (no auth headers)."""
 
-    def __init__(self, lambda_url: str, timeout: timedelta = timedelta(seconds=1)):
+    def __init__(
+        self,
+        lambda_url: str,
+        headers: dict[str, str] | None = None,
+        timeout: timedelta = timedelta(seconds=1),
+    ):
         self._lambda_url = lambda_url
+        self._default_headers = {"Content-Type": "application/fhir+json"} | (
+            headers or {}
+        )
         self._timeout = timeout.total_seconds()
 
     def send(
-        self, data: str, path: str, request_method: _RequestMethod
+        self,
+        data: str,
+        path: str,
+        request_method: _RequestMethod,
+        headers: dict[str, str] | None = None,
     ) -> requests.Response:
 
         return self._send(
-            data=data, path=path, include_payload=True, request_method=request_method
+            data=data,
+            path=path,
+            include_payload=True,
+            request_method=request_method,
+            headers=headers,
         )
 
     def send_without_payload(
-        self, path: str, request_method: _RequestMethod
+        self,
+        path: str,
+        request_method: _RequestMethod,
+        headers: dict[str, str] | None = None,
     ) -> requests.Response:
 
         return self._send(
-            data=None, path=path, include_payload=False, request_method=request_method
+            data=None,
+            path=path,
+            include_payload=False,
+            request_method=request_method,
+            headers=headers,
         )
 
     def _send(
@@ -73,20 +103,24 @@ class LocalClient:
         path: str,
         include_payload: bool,
         request_method: _RequestMethod,
+        headers: dict[str, str] | None = None,
     ) -> requests.Response:
         url = f"{self._lambda_url}/{path}"
+        merged_headers = self._default_headers | (headers or {})
         match request_method:
             case "POST":
                 return requests.post(
                     url,
                     data=data if include_payload else None,
                     timeout=self._timeout,
+                    headers=merged_headers,
                 )
             case "GET":
                 return requests.get(
                     url,
                     data=data if include_payload else None,
                     timeout=self._timeout,
+                    headers=merged_headers,
                 )
 
 
@@ -241,7 +275,9 @@ def _create_remote_client(request: pytest.FixtureRequest) -> RemoteClient:
     else:
         auth_headers = default_auth_headers
 
-    return RemoteClient(api_url=proxy_url, auth_headers=auth_headers)
+    return RemoteClient(
+        api_url=proxy_url, auth_headers=auth_headers, timeout=timedelta(seconds=30)
+    )
 
 
 def _fetch_env_variable[T](name: str, _: type[T]) -> T:
