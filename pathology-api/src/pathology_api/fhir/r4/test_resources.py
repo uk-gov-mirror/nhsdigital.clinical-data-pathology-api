@@ -7,7 +7,13 @@ from pydantic import BaseModel
 
 from pathology_api.exception import ValidationError
 
-from .elements import LogicalReference, PatientIdentifier
+from .elements import (
+    Extension,
+    LiteralReference,
+    LogicalReference,
+    PatientIdentifier,
+    ReferenceExtension,
+)
 from .resources import Bundle, Composition, OperationOutcome, Patient, Resource
 
 
@@ -114,6 +120,88 @@ class TestResource:
         ):
             Bundle.model_validate_json(json, strict=True)
 
+    expected_extension = ReferenceExtension(
+        valueReference=LiteralReference(reference="expected_reference"),
+        url="expected_url",
+    )
+
+    @pytest.mark.parametrize(
+        ("extensions", "expected_result"),
+        [
+            pytest.param(
+                [
+                    expected_extension,
+                ],
+                expected_extension,
+                id="Single extension",
+            ),
+            pytest.param(
+                [
+                    expected_extension,
+                    ReferenceExtension(
+                        valueReference=LiteralReference(reference="second_reference"),
+                        url="second_url",
+                    ),
+                ],
+                expected_extension,
+                id="Multiple extensions",
+            ),
+        ],
+    )
+    def test_find_extension(
+        self, extensions: list[Extension], expected_result: Extension
+    ) -> None:
+        bundle = Bundle.create(type="document", extension=extensions, entry=[])
+
+        assert (
+            bundle.find_extension(url="expected_url", required_type=ReferenceExtension)
+            == expected_result
+        )
+
+        assert (
+            bundle.find_extension(url="expected_url", required_type=Extension)
+            == expected_result
+        )
+
+    def test_find_extension_no_extensions(self) -> None:
+        bundle = Bundle.create(type="document", entry=[])
+
+        assert (
+            bundle.find_extension(url="expected_url", required_type=Extension) is None
+        )
+
+    def test_find_extension_duplicate_url(self) -> None:
+        bundle = Bundle.create(
+            type="document",
+            extension=[
+                self.expected_extension,
+                self.expected_extension,
+            ],
+            entry=[],
+        )
+
+        with pytest.raises(
+            ValidationError,
+            match="Multiple extensions provided with same url: expected_url",
+        ):
+            bundle.find_extension(url="expected_url", required_type=Extension)
+
+    def test_find_extension_wrong_type(self) -> None:
+        class _ExtensionStub(Extension, type_name="stub"):
+            pass
+
+        bundle = Bundle.create(
+            type="document",
+            extension=[_ExtensionStub(url="expected_url")],
+            entry=[],
+        )
+
+        with pytest.raises(
+            ValidationError,
+            match="Extension with url expected_url is not expected type Reference",
+        ):
+            bundle.find_extension(url="expected_url", required_type=ReferenceExtension)
+
 
 class TestBundle:
     def test_create(self) -> None:
@@ -142,7 +230,7 @@ class TestBundle:
         assert bundle.identifier is None
         assert bundle.entries is None
 
-    expected_resource = Composition.create(
+    expected_composition = Composition.create(
         subject=LogicalReference(
             identifier=PatientIdentifier.from_nhs_number("nhs_number")
         )
@@ -155,24 +243,24 @@ class TestBundle:
                 [
                     Bundle.Entry(
                         fullUrl="fullUrl",
-                        resource=expected_resource,
+                        resource=expected_composition,
                     ),
                     Bundle.Entry(
                         fullUrl="fullUrl",
-                        resource=expected_resource,
+                        resource=expected_composition,
                     ),
                 ],
-                [expected_resource, expected_resource],
+                [expected_composition, expected_composition],
                 id="Duplicate resources",
             ),
             pytest.param(
                 [
                     Bundle.Entry(
                         fullUrl="fullUrl",
-                        resource=expected_resource,
+                        resource=expected_composition,
                     ),
                 ],
-                [expected_resource],
+                [expected_composition],
                 id="Single resource",
             ),
         ],
@@ -218,6 +306,120 @@ class TestBundle:
             "input_value={'resourceType': 'Bundle'}, input_type=dict]*",
         ):
             Bundle.model_validate_json('{"resourceType": "Bundle"}')
+
+    def test_has_resource(self) -> None:
+        expected_resource = Patient.create(
+            identifier=PatientIdentifier.from_nhs_number("nhs_number")
+        )
+
+        bundle = Bundle.create(
+            type="document",
+            entry=[Bundle.Entry(fullUrl="fullUrl", resource=expected_resource)],
+        )
+
+        assert bundle.has_resource(Patient) is True
+        assert bundle.has_resource(Resource) is True
+        assert bundle.has_resource(Composition) is False
+
+    def test_has_resource_no_resources(self) -> None:
+        bundle = Bundle.empty("document")
+
+        assert bundle.has_resource(Resource) is False
+
+    expected_patient = Patient.create(
+        identifier=PatientIdentifier.from_nhs_number("nhs_number")
+    )
+
+    @pytest.mark.parametrize(
+        ("bundle", "expected_resource"),
+        [
+            pytest.param(
+                Bundle.create(
+                    type="document",
+                    entry=[
+                        Bundle.Entry(
+                            fullUrl="fullUrl",
+                            resource=expected_patient,
+                        )
+                    ],
+                ),
+                expected_patient,
+                id="Bundle with single resource",
+            ),
+            pytest.param(
+                Bundle.create(
+                    type="document",
+                    entry=[
+                        Bundle.Entry(
+                            fullUrl="fullUrl",
+                            resource=expected_patient,
+                        ),
+                        Bundle.Entry(
+                            fullUrl="secondUrl",
+                            resource=Patient.create(
+                                identifier=PatientIdentifier.from_nhs_number(
+                                    "second_nhs_number"
+                                )
+                            ),
+                        ),
+                    ],
+                ),
+                expected_patient,
+                id="Bundle with multiple resources",
+            ),
+        ],
+    )
+    def test_get_resource(self, bundle: Bundle, expected_resource: Patient) -> None:
+        assert bundle.get_resource(url="fullUrl", t=Patient) == expected_resource
+        assert bundle.get_resource(url="fullUrl", t=Resource) == expected_resource
+
+    def test_get_resource_no_resources(self) -> None:
+        bundle = Bundle.empty("document")
+
+        assert bundle.get_resource(url="fullUrl", t=Resource) is None
+
+    def test_get_resource_wrong_type(self) -> None:
+        expected_resource = Patient.create(
+            identifier=PatientIdentifier.from_nhs_number("nhs_number")
+        )
+
+        bundle = Bundle.create(
+            type="document",
+            entry=[Bundle.Entry(fullUrl="fullUrl", resource=expected_resource)],
+        )
+
+        assert bundle.get_resource(url="fullUrl", t=Composition) is None
+
+    def test_get_resource_wrong_url(self) -> None:
+        expected_resource = Patient.create(
+            identifier=PatientIdentifier.from_nhs_number("nhs_number")
+        )
+
+        bundle = Bundle.create(
+            type="document",
+            entry=[Bundle.Entry(fullUrl="fullUrl", resource=expected_resource)],
+        )
+
+        assert bundle.get_resource(url="wrongUrl", t=Patient) is None
+
+    def test_get_resource_multiple_resources_same_url(self) -> None:
+        expected_resource = Patient.create(
+            identifier=PatientIdentifier.from_nhs_number("nhs_number")
+        )
+
+        bundle = Bundle.create(
+            type="document",
+            entry=[
+                Bundle.Entry(fullUrl="fullUrl", resource=expected_resource),
+                Bundle.Entry(fullUrl="fullUrl", resource=expected_resource),
+            ],
+        )
+
+        with pytest.raises(
+            ValidationError,
+            match="Multiple resources provided with same fullUrl: fullUrl",
+        ):
+            bundle.get_resource(url="fullUrl", t=Patient)
 
 
 class TestOperationOutcome:

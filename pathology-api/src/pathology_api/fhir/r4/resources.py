@@ -13,7 +13,15 @@ from pydantic import (
 
 from pathology_api.exception import ValidationError
 
-from .elements import LogicalReference, Meta, PatientIdentifier, UUIDIdentifier
+from .elements import (
+    Extension,
+    Identifier,
+    LiteralReference,
+    LogicalReference,
+    Meta,
+    PatientIdentifier,
+    UUIDIdentifier,
+)
 
 
 class Resource(BaseModel):
@@ -28,12 +36,34 @@ class Resource(BaseModel):
     id: Annotated[str | None, Field(frozen=True)] = None
     meta: Annotated[Meta | None, Field(alias="meta", frozen=True)] = None
     resource_type: str = Field(alias="resourceType", frozen=True)
+    extension: Annotated[list[SerializeAsAny[Extension]] | None, Field(frozen=True)] = (
+        None
+    )
 
     def __init_subclass__(cls, resource_type: str, **kwargs: Any) -> None:
         cls.__resource_types[resource_type] = cls
         cls.__expected_resource_type[cls] = resource_type
 
         super().__init_subclass__(**kwargs)
+
+    def find_extension[T: Extension](
+        self, url: str, required_type: type[T]
+    ) -> T | None:
+        extensions = [ext for ext in self.extension or [] if ext.url == url]
+        if not extensions:
+            return None
+
+        if len(extensions) > 1:
+            raise ValidationError(f"Multiple extensions provided with same url: {url}")
+
+        extension = extensions[0]
+        if not isinstance(extension, required_type):
+            raise ValidationError(
+                f"Extension with url {url} is not expected type "
+                f"{required_type.type_name}"
+            )
+
+        return extension
 
     @model_validator(mode="wrap")
     @classmethod
@@ -120,6 +150,48 @@ class Bundle(Resource, resource_type="Bundle"):
             if isinstance(entry.resource, t)
         ]
 
+    def has_resource[T: Resource](self, t: type[T]) -> bool:
+        """
+        Check if the bundle contains at least one resource of a given type in its
+        entries.
+        If the bundle has no entries, False is returned.
+        Args:
+            t: The resource type to search for.
+        Returns:
+            True if at least one resource of the specified type is found, otherwise
+            False.
+        """
+        return self.find_resources(t) != []
+
+    def get_resource[T: Resource](self, url: str, t: type[T]) -> T | None:
+        """
+        Get the resource of a given type in the bundle entries with the specified
+        fullUrl.
+        If no matching resource is found, or if the matching resource is not of the
+        expected type, a ValidationError is raised.
+        Args:
+            url: The fullUrl of the resource to find.
+            t: The expected type of the resource.
+        Returns:
+            The resource with the specified fullUrl and type. Or None if not resource is
+            found with the provided url and required type.
+        """
+        resources = [
+            entry.resource
+            for entry in self.entries or []
+            if entry.full_url == url and isinstance(entry.resource, t)
+        ]
+
+        if not resources:
+            return None
+
+        if len(resources) > 1:
+            raise ValidationError(
+                f"Multiple resources provided with same fullUrl: {url}"
+            )
+
+        return resources[0]
+
     @classmethod
     def empty(cls, bundle_type: BundleType) -> "Bundle":
         """Create an empty Bundle of the specified type."""
@@ -133,6 +205,8 @@ class Patient(Resource, resource_type="Patient"):
 class ServiceRequest(Resource, resource_type="ServiceRequest"):
     """A FHIR R4 ServiceRequest resource."""
 
+    requester: LiteralReference | None = Field(None, frozen=True)
+
 
 class DiagnosticReport(Resource, resource_type="DiagnosticReport"):
     """A FHIR R4 DiagnosticReport resource."""
@@ -141,6 +215,8 @@ class DiagnosticReport(Resource, resource_type="DiagnosticReport"):
 class Organization(Resource, resource_type="Organization"):
     """A FHIR R4 Organization resource."""
 
+    identifier: SerializeAsAny[list[Identifier]] | None = Field(None, frozen=True)
+
 
 class Practitioner(Resource, resource_type="Practitioner"):
     """A FHIR R4 Practitioner resource."""
@@ -148,6 +224,8 @@ class Practitioner(Resource, resource_type="Practitioner"):
 
 class PractitionerRole(Resource, resource_type="PractitionerRole"):
     """A FHIR R4 PractitionerRole resource."""
+
+    organization: LiteralReference | None = Field(None, frozen=True)
 
 
 class Observation(Resource, resource_type="Observation"):

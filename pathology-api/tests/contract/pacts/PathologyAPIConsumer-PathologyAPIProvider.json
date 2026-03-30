@@ -13,6 +13,14 @@
               {
                 "fullUrl": "composition",
                 "resource": {
+                  "extension": [
+                    {
+                      "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                      "valueReference": {
+                        "reference": "servicerequest"
+                      }
+                    }
+                  ],
                   "resourceType": "Composition",
                   "subject": {
                     "identifier": {
@@ -20,6 +28,36 @@
                       "value": "nhs_number"
                     }
                   }
+                }
+              },
+              {
+                "fullUrl": "servicerequest",
+                "resource": {
+                  "requester": {
+                    "reference": "practitionerrole"
+                  },
+                  "resourceType": "ServiceRequest"
+                }
+              },
+              {
+                "fullUrl": "practitionerrole",
+                "resource": {
+                  "organization": {
+                    "reference": "organization"
+                  },
+                  "resourceType": "PractitionerRole"
+                }
+              },
+              {
+                "fullUrl": "organization",
+                "resource": {
+                  "identifier": [
+                    {
+                      "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                      "value": "ods_code"
+                    }
+                  ],
+                  "resourceType": "Organization"
                 }
               }
             ],
@@ -47,6 +85,14 @@
               {
                 "fullUrl": "composition",
                 "resource": {
+                  "extension": [
+                    {
+                      "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                      "valueReference": {
+                        "reference": "servicerequest"
+                      }
+                    }
+                  ],
                   "resourceType": "Composition",
                   "subject": {
                     "identifier": {
@@ -54,6 +100,36 @@
                       "value": "nhs_number"
                     }
                   }
+                }
+              },
+              {
+                "fullUrl": "servicerequest",
+                "resource": {
+                  "requester": {
+                    "reference": "practitionerrole"
+                  },
+                  "resourceType": "ServiceRequest"
+                }
+              },
+              {
+                "fullUrl": "practitionerrole",
+                "resource": {
+                  "organization": {
+                    "reference": "organization"
+                  },
+                  "resourceType": "PractitionerRole"
+                }
+              },
+              {
+                "fullUrl": "organization",
+                "resource": {
+                  "identifier": [
+                    {
+                      "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                      "value": "ods_code"
+                    }
+                  ],
+                  "resourceType": "Organization"
                 }
               }
             ],

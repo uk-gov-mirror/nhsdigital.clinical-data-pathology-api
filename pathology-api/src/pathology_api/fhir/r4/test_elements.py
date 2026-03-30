@@ -8,10 +8,14 @@ from pydantic import BaseModel
 from pathology_api.exception import ValidationError
 
 from .elements import (
+    Extension,
     Identifier,
     LogicalReference,
     Meta,
+    OrganizationIdentifier,
     PatientIdentifier,
+    ReferenceExtension,
+    UnknownIdentifier,
     UUIDIdentifier,
 )
 
@@ -65,13 +69,13 @@ class TestMeta:
 class TestUUIDIdentifier:
     def test_create_with_value(self) -> None:
         expected_uuid = uuid.UUID("12345678-1234-5678-1234-567812345678")
-        identifier = UUIDIdentifier(value=expected_uuid)
+        identifier = UUIDIdentifier.create_with_uuid(expected_uuid)
 
         assert identifier.system == "https://tools.ietf.org/html/rfc4122"
         assert identifier.value == str(expected_uuid)
 
     def test_create_without_value(self) -> None:
-        identifier = UUIDIdentifier()
+        identifier = UUIDIdentifier.create_with_uuid()
 
         assert identifier.system == "https://tools.ietf.org/html/rfc4122"
         # Validates that value is a valid UUID v4
@@ -79,11 +83,15 @@ class TestUUIDIdentifier:
         assert parsed_uuid.version == 4
 
 
-class _TestContainer(BaseModel):
+class _TestIdentifierContainer(BaseModel):
     identifier: "IdentifierStub"
 
     class IdentifierStub(Identifier, expected_system="expected-system"):
         pass
+
+
+class _TestIdentifierListContainer(BaseModel):
+    identifier: list[Identifier]
 
 
 class TestIdentifier:
@@ -93,18 +101,58 @@ class TestIdentifier:
             match="Identifier system 'invalid-system' does not match expected "
             "system 'expected-system'.",
         ):
-            _TestContainer.model_validate(
+            _TestIdentifierContainer.model_validate(
                 {"identifier": {"system": "invalid-system", "value": "some-value"}}
             )
 
     def test_without_value(self) -> None:
         with pytest.raises(
             pydantic.ValidationError,
-            match="1 validation error for _TestContainer\nidentifier.value\n  "
+            match="1 validation error for _TestIdentifierContainer"
+            "\nidentifier.value\n  "
             "Field required [type=missing, input_value={'system': 'expected-system'},"
             " input_type=dict]*",
         ):
-            _TestContainer.model_validate({"identifier": {"system": "expected-system"}})
+            _TestIdentifierContainer.model_validate(
+                {"identifier": {"system": "expected-system"}}
+            )
+
+    def test_unknown_system(self) -> None:
+
+        result = _TestIdentifierListContainer.model_validate(
+            {"identifier": [{"system": "unknown-system", "value": "some-value"}]}
+        )
+
+        assert isinstance(result.identifier[0], UnknownIdentifier)
+
+    def test_deserialises_by_system(self) -> None:
+        result = _TestIdentifierListContainer.model_validate(
+            {
+                "identifier": [
+                    {
+                        "system": "unknown-system",
+                        "value": "some-value",
+                    },
+                    {
+                        "system": "https://fhir.nhs.uk/Id/nhs-number",
+                        "value": "second-value",
+                    },
+                ]
+            }
+        )
+
+        assert isinstance(result.identifier[0], UnknownIdentifier)
+        assert isinstance(result.identifier[1], PatientIdentifier)
+
+
+class TestUnknownIdentifier:
+    def test_does_not_validate_system(self) -> None:
+        result = UnknownIdentifier.model_validate(
+            {"system": "any-system", "value": "some-value"}
+        )
+
+        assert result.system == "any-system"
+        assert result.value == "some-value"
 
 
 class TestPatientIdentifier:
@@ -115,6 +163,15 @@ class TestPatientIdentifier:
 
         assert identifier.system == "https://fhir.nhs.uk/Id/nhs-number"
         assert identifier.value == nhs_number
+
+
+class TestOrganizationIdentifier:
+    def test_create_from_ods_code(self) -> None:
+        expected_ods_code = "ods_code"
+        identifier = OrganizationIdentifier.from_ods_code(expected_ods_code)
+
+        assert identifier.system == "https://fhir.nhs.uk/Id/ods-organization-code"
+        assert identifier.value == expected_ods_code
 
 
 class TestLogicalReference:
@@ -165,3 +222,27 @@ class TestLogicalReference:
         assert isinstance(created_identifier, PatientIdentifier)
         assert created_identifier.system == "https://fhir.nhs.uk/Id/nhs-number"
         assert created_identifier.value == "nhs_number"
+
+
+class TestExtension:
+    def test_deserialises_on_type(self) -> None:
+        result = Extension.model_validate(
+            {"url": "test-extension", "valueReference": {"reference": "test-reference"}}
+        )
+
+        assert isinstance(result, ReferenceExtension)
+
+        unknown_type = Extension.model_validate(
+            {"url": "unknown-extension", "valueString": "test-value"}
+        )
+
+        assert isinstance(unknown_type, Extension)
+        assert not isinstance(unknown_type, ReferenceExtension)
+
+    def test_deserialises_wrong_casing(self) -> None:
+        result = Extension.model_validate(
+            {"url": "test-extension", "valuereference": {"reference": "test-reference"}}
+        )
+
+        assert isinstance(result, Extension)
+        assert not isinstance(result, ReferenceExtension)

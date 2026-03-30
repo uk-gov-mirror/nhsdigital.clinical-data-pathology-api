@@ -1,5 +1,6 @@
 import logging
 import os
+from collections.abc import Callable
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -20,8 +21,8 @@ with patch("aws_lambda_powertools.utilities.parameters.get_secret") as get_secre
     from lambda_handler import handler
 
 from pathology_api.exception import ValidationError
-from pathology_api.fhir.r4.elements import LogicalReference, Meta, PatientIdentifier
-from pathology_api.fhir.r4.resources import Bundle, Composition, OperationOutcome
+from pathology_api.fhir.r4.elements import Meta
+from pathology_api.fhir.r4.resources import Bundle, OperationOutcome
 
 TEST_CORRELATION_ID = "b876145d-1ebf-4e22-8ff8-275b570c1ec4"
 
@@ -59,20 +60,8 @@ class TestHandler:
         return returned_issue
 
     @pytest.fixture
-    def bundle(self) -> Bundle:
-        return Bundle.create(
-            type="document",
-            entry=[
-                Bundle.Entry(
-                    fullUrl="composition",
-                    resource=Composition.create(
-                        subject=LogicalReference(
-                            PatientIdentifier.from_nhs_number("nhs_number")
-                        )
-                    ),
-                )
-            ],
-        )
+    def bundle(self, build_valid_test_result: Callable[[str, str], Bundle]) -> Bundle:
+        return build_valid_test_result("nhs_number", "ods_code")
 
     @pytest.fixture
     def context(self) -> LambdaContext:
@@ -223,7 +212,10 @@ class TestHandler:
         ],
     )
     def test_malicious_correlation_id_values_are_rejected(
-        self, malicious_value: str, bundle: Bundle, context: LambdaContext
+        self,
+        malicious_value: str,
+        bundle: Bundle,
+        context: LambdaContext,
     ) -> None:
         event = self._create_test_event(
             body=bundle.model_dump_json(by_alias=True),

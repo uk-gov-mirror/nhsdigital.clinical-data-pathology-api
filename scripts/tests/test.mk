@@ -143,9 +143,10 @@ test-local: env-local
 
 # Run tests against remote lambda, exporting APIGEE_ACCESS_TOKEN only
 test-remote: env-remote
+	@echo "Running test stage: $${stage:-all}"
 	@echo "Obtaining APIGEE access token..."
 	@set -a && source .env && set +a && \
 		APIGEE_ACCESS_TOKEN="$$(./scripts/get_apigee_token.sh)" && \
 		BASE_URL="$${BASE_URL}-pr-$${PR_NUMBER}" && \
 		export APIGEE_ACCESS_TOKEN BASE_URL && \
-		$(MAKE) test
+		$(MAKE) test$(if $(stage),-$(stage),)
