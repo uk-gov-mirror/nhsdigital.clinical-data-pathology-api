@@ -31,10 +31,15 @@ class TestBundleEndpoint:
             data=bundle.model_dump_json(by_alias=True),
             path="FHIR/R4/Bundle",
             request_method="POST",
+            headers={"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
         )
 
         assert response.status_code == 200
         assert response.headers["Content-Type"] == "application/fhir+json"
+        assert (
+            response.headers["X-Correlation-ID"]
+            == "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"
+        )
 
         response_data = response.json()
         response_bundle = Bundle.model_validate(response_data, by_alias=True)
@@ -264,7 +269,6 @@ class TestStatusEndpoint:
 
         assert parsed.status == "pass"
         assert parsed.checks.healthcheck.responseCode == 200
-        assert parsed.checks.healthcheck.outcome == "OK"
 
 
 class StatusLinks(BaseModel):
@@ -275,7 +279,7 @@ class HealthCheck(BaseModel):
     status: Literal["pass", "fail"]
     timeout: Literal["true", "false"]
     responseCode: int
-    outcome: str
+    outcome: dict[Any, Any]
     links: StatusLinks
 
 
