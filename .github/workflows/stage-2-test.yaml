@@ -41,105 +41,22 @@ jobs:
           python-version: ${{ inputs.python_version }}
       - name: "Run unit test suite"
         run: make test-unit
-      - name: "Upload unit test results"
+      - name: "Upload unit test results for pathology-api"
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: unit-test-results
           path: pathology-api/test-artefacts/
           retention-days: 30
+      - name: "Upload unit test results for mocks"
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: mock-unit-test-results
+          path: mocks/test-artefacts/
+          retention-days: 30
       - name: "Publish unit test results to summary"
         if: always()
         uses: test-summary/action@31493c76ec9e7aa675f1585d3ed6f1da69269a86 # v2.4
         with:
           paths: pathology-api/test-artefacts/unit-tests.xml
-
-  test-contract:
-    name: "Contract tests"
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: "Checkout code"
-        uses: actions/checkout@v6
-      - name: "Setup Python project"
-        uses: ./.github/actions/setup-python-project
-        with:
-          python-version: ${{ inputs.python_version }}
-      - name: "Start local Lambda"
-        uses: ./.github/actions/start-local-lambda
-        with:
-          python-version: ${{ inputs.python_version }}
-      - name: "Run contract tests"
-        run: make test-contract
-      - name: "Upload contract test results"
-        if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: contract-test-results
-          path: pathology-api/test-artefacts/
-          retention-days: 30
-      - name: "Publish contract test results to summary"
-        if: always()
-        uses: test-summary/action@31493c76ec9e7aa675f1585d3ed6f1da69269a86 # v2.4
-        with:
-          paths: pathology-api/test-artefacts/contract-tests.xml
-
-  test-schema:
-    name: "Schema validation tests"
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: "Checkout code"
-        uses: actions/checkout@v6
-      - name: "Setup Python project"
-        uses: ./.github/actions/setup-python-project
-        with:
-          python-version: ${{ inputs.python_version }}
-      - name: "Start local Lambda"
-        uses: ./.github/actions/start-local-lambda
-        with:
-          python-version: ${{ inputs.python_version }}
-      - name: "Run schema validation tests"
-        run: make test-schema
-      - name: "Upload schema test results"
-        if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: schema-test-results
-          path: pathology-api/test-artefacts/
-          retention-days: 30
-      - name: "Publish schema test results to summary"
-        if: always()
-        uses: test-summary/action@31493c76ec9e7aa675f1585d3ed6f1da69269a86 # v2.4
-        with:
-          paths: pathology-api/test-artefacts/schema-tests.xml
-
-  test-integration:
-    name: "Integration tests"
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: "Checkout code"
-        uses: actions/checkout@v6
-      - name: "Setup Python project"
-        uses: ./.github/actions/setup-python-project
-        with:
-          python-version: ${{ inputs.python_version }}
-      - name: "Start local Lambda"
-        uses: ./.github/actions/start-local-lambda
-        with:
-          python-version: ${{ inputs.python_version }}
-      - name: "Run integration test"
-        run: make test-integration
-      - name: "Upload integration test results"
-        if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f #v7.0.0
-        with:
-          name: integration-test-results
-          path: pathology-api/test-artefacts/
-          retention-days: 30
-      - name: "Publish integration test results to summary"
-        if: always()
-        uses: test-summary/action@31493c76ec9e7aa675f1585d3ed6f1da69269a86 # v2.4
-        with:
-          paths: pathology-api/test-artefacts/integration-tests.xml

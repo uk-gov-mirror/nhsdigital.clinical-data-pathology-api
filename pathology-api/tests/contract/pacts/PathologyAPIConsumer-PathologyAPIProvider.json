@@ -26,12 +26,15 @@
             "resourceType": "Bundle",
             "type": "document"
           },
-          "contentType": "application/json",
+          "contentType": "application/fhir+json",
           "encoded": false
         },
         "headers": {
           "Content-Type": [
-            "application/json"
+            "application/fhir+json"
+          ],
+          "X-Correlation-ID": [
+            "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"
           ]
         },
         "method": "POST",

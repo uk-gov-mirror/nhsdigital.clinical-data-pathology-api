@@ -33,7 +33,7 @@ cd "$(git rev-parse --show-toplevel)"
 
 # Determine test path based on test type
 if [[ "$TEST_TYPE" = "unit" ]]; then
-  TEST_PATH="test_*.py src/"
+  TEST_PATH="src/ test_*.py"
 else
   TEST_PATH="tests/${TEST_TYPE}/"
 fi
@@ -41,7 +41,7 @@ fi
 cd pathology-api
 mkdir -p test-artefacts
 
-echo "Running ${TEST_TYPE} tests..."
+echo "Running ${TEST_TYPE} tests for pathology-api..."
 
 # Set coverage path based on test type
 if [[ "$TEST_TYPE" = "unit" ]]; then
@@ -72,3 +72,21 @@ fi
 
 # Save coverage data file for merging
 mv .coverage "test-artefacts/coverage.${TEST_TYPE}"
+
+if [[ "$TEST_TYPE" = "unit" ]]; then
+  cd ..
+  cd mocks
+  mkdir -p test-artefacts
+  echo "Running ${TEST_TYPE} tests for mocks..."
+    # Note: TEST_PATH is intentionally unquoted to allow glob expansion for unit tests
+  poetry run pytest ${TEST_PATH} -v \
+    --cov=${COV_PATH} \
+    --cov-report=html:test-artefacts/coverage-html \
+    --cov-report=term \
+    --junit-xml="test-artefacts/${TEST_TYPE}-tests.xml" \
+    --html="test-artefacts/${TEST_TYPE}-tests.html" --self-contained-html
+
+  mv .coverage "test-artefacts/coverage.${TEST_TYPE}"
+fi
+
+

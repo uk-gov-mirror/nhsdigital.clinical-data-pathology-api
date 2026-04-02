@@ -14,7 +14,4 @@ export PATH="/pipx/bin:$PATH"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 
-# Auto-activate pathology environment
-pyenv shell pathology 2>/dev/null || true
-
 alias docker="doas docker"

@@ -67,10 +67,14 @@ class TestConsumerContract:
         # Define the expected interaction
         (
             pact.upon_receiving("a request for the Bundle endpoint")
-            .with_body(request_body)
+            .with_body(request_body, content_type="application/fhir+json")
             .with_request(
                 method="POST",
                 path="/FHIR/R4/Bundle",
+            )
+            .with_headers(
+                {"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
+                part="Request",
             )
             .will_respond_with(status=200)
             .with_body(
@@ -85,6 +89,10 @@ class TestConsumerContract:
             response = requests.post(
                 f"{server.url}/FHIR/R4/Bundle",
                 json=request_body,
+                headers={
+                    "Content-Type": "application/fhir+json",
+                    "X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16",
+                },
                 timeout=10,
             )
 
