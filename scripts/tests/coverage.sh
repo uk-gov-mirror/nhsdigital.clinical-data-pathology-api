@@ -23,3 +23,19 @@ poetry run coverage xml -o test-artefacts/coverage-merged.xml
 sed -i -e 's#filename="src/#filename="pathology-api/src/#g' \
         -e 's#filename="\([^/"]*\.py\)"#filename="pathology-api/\1"#g' \
         test-artefacts/coverage-merged.xml
+
+
+cd ..
+cd mocks/test-artefacts
+mv coverage.unit .coverage.unit
+# Go back to mock root for coverage operations
+cd ..
+poetry run coverage combine test-artefacts
+
+# Generate reports
+poetry run coverage report
+poetry run coverage xml -o test-artefacts/coverage-merged.xml
+# Fix paths in XML to be relative to repository root for SonarCloud
+sed -i -e 's#filename="src/#filename="mocks/src/#g' \
+        -e 's#filename="\([^/"]*\.py\)"#filename="mocks/\1"#g' \
+        test-artefacts/coverage-merged.xml

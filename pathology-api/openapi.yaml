@@ -104,9 +104,10 @@ paths:
         - name: X-Correlation-ID
           in: header
           required: false
-          description: Arbitrary identifier used to identifiy a given request. Useful when debugging or tracing a request that has been sent to this endpoint, as its value will be echoed in any response.
+          description: Arbitrary identifier used to identify a given request. Useful when debugging or tracing a request that has been sent to this endpoint, as its value will be echoed in any response.
           schema:
             type: string
+            format: uuid
             example: "b876145d-1ebf-4e22-8ff8-275b570c1ec4"
         - name: X-Request-ID
           in: header

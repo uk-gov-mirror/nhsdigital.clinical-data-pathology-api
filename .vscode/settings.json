@@ -54,6 +54,10 @@
   "gitlens.ai.enabled": false,
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": [
+    "pathology-api",
+    "mocks"
+  ],
   "git.enableCommitSigning": true,
   "sonarlint.connectedMode.project": {
     "connectionId": "nhsdigital",

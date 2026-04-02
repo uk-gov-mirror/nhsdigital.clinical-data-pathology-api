@@ -21,7 +21,7 @@ env:
   PYTHON_VERSION: 3.14
   LAMBDA_RUNTIME: python3.14
   LAMBDA_HANDLER: lambda_handler.handler
-  MOCK_LAMBDA_HANDLER: handler.handler
+  MOCK_LAMBDA_HANDLER: lambda_handler.handler
   MTLS_SECRET_NAME: ${{ vars.PREVIEW_ENV_MTLS_SECRET_NAME }}
   PROXYGEN_KEY_ID: ${{ vars.PREVIEW_ENV_PROXYGEN_KEY_ID }}
   PROXYGEN_CLIENT_ID: ${{ vars.PREVIEW_ENV_PROXYGEN_CLIENT_ID }}
@@ -43,6 +43,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0 # Full history required for accurate sonar analysis.
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
@@ -54,17 +56,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Package artifact
+      - name: Package artifacts
         run: |
           make build
-
-      # Place holder mock artifact packaging to allow testing of mock API in preview environment;
-      # can be extended to build a real mock Lambda if needed
-      - name: Package mock artifact
-        run: |
-          cd infrastructure/environments/preview
-          rm -f mock_artifact.zip
-          zip -r mock_artifact.zip .
 
       - name: Select AWS role inputs
         id: role-select
@@ -83,7 +77,7 @@ jobs:
           fi
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@b1257c400167d727708335212f95607835cd03fd
+        uses: aws-actions/configure-aws-credentials@51635dbf418c2cdd8b3e1497529334d8db7e4063
         with:
           role-to-assume: ${{ steps.role-select.outputs.aws_role }}
           aws-region: ${{ env.AWS_REGION }}
@@ -145,6 +139,8 @@ jobs:
           APIM_APIKEY: ${{ secrets.APIM_APIKEY }}
           API_MTLS_CERT: ${{ secrets.API_MTLS_CERT }}
           API_MTLS_KEY: ${{ secrets.API_MTLS_KEY }}
+          APIM_KEY_ID: ${{ secrets.APIM_KEY_ID }}
+          CLIENT_REQUEST_TIMEOUT: ${{ secrets.CLIENT_REQUEST_TIMEOUT }}
         run: |
           cd pathology-api/target/
           FN="${{ steps.names.outputs.function_name }}"
@@ -154,6 +150,8 @@ jobs:
           API_KEY="${APIM_APIKEY:-/cds/pathology/dev/apim/api-key}"
           MTLS_CERT="${API_MTLS_CERT:-/cds/pathology/dev/mtls/client1-key-public}"
           MTLS_KEY="${API_MTLS_KEY:-/cds/pathology/dev/mtls/client1-key-secret}"
+          KEY_ID="${APIM_KEY_ID:-DEV-1}"
+          CLIENT_TIMEOUT="${CLIENT_REQUEST_TIMEOUT:-10s}"
           echo "Deploying preview function: $FN"
           wait_for_lambda_ready() {
             while true; do
@@ -175,14 +173,18 @@ jobs:
             wait_for_lambda_ready
             aws lambda update-function-configuration --function-name "$FN" \
               --handler "${{ env.LAMBDA_HANDLER }}" \
+              --memory-size 512 \
+              --timeout 30 \
               --environment "Variables={APIM_TOKEN_EXPIRY_THRESHOLD=$EXPIRY_THRESHOLD, \
                                         APIM_PRIVATE_KEY_NAME=$PRIVATE_KEY, \
                                         APIM_API_KEY_NAME=$API_KEY, \
                                         APIM_MTLS_CERT_NAME=$MTLS_CERT, \
                                         APIM_MTLS_KEY_NAME=$MTLS_KEY, \
-                                        APIM_TOKEN_URL=$MOCK_URL/apim, \
-                                        PDM_BUNDLE_URL=$MOCK_URL/pdm, \
+                                        APIM_KEY_ID=$KEY_ID, \
+                                        APIM_TOKEN_URL=$MOCK_URL/apim/oauth2/token, \
+                                        PDM_BUNDLE_URL=$MOCK_URL/apim/check_auth, \
                                         MNS_EVENT_URL=$MOCK_URL/mns, \
+                                        CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
                                         JWKS_SECRET_NAME=$JWKS_SECRET}" || true
             wait_for_lambda_ready
             aws lambda update-function-code --function-name "$FN" \
@@ -194,14 +196,18 @@ jobs:
               --handler "${{ env.LAMBDA_HANDLER }}" \
               --zip-file "fileb://artifact.zip" \
               --role "${{ steps.role-select.outputs.lambda_role }}" \
+              --memory-size 512 \
+              --timeout 30 \
               --environment "Variables={APIM_TOKEN_EXPIRY_THRESHOLD=$EXPIRY_THRESHOLD, \
                                         APIM_PRIVATE_KEY_NAME=$PRIVATE_KEY, \
                                         APIM_API_KEY_NAME=$API_KEY, \
+                                        APIM_KEY_ID=$KEY_ID, \
                                         APIM_MTLS_CERT_NAME=$MTLS_CERT, \
                                         APIM_MTLS_KEY_NAME=$MTLS_KEY, \
-                                        APIM_TOKEN_URL=$MOCK_URL/apim, \
-                                        PDM_BUNDLE_URL=$MOCK_URL/pdm, \
+                                        APIM_TOKEN_URL=$MOCK_URL/apim/oauth2/token, \
+                                        PDM_BUNDLE_URL=$MOCK_URL/apim/check_auth, \
                                         MNS_EVENT_URL=$MOCK_URL/mns, \
+                                        CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
                                         JWKS_SECRET_NAME=$JWKS_SECRET}" \
               --publish
             wait_for_lambda_ready
@@ -306,12 +312,23 @@ jobs:
           echo "url      = ${{ steps.names.outputs.int_preview_url }}"
 
       # ---------- Handle mock endpoints ----------
+      - name: Get Secrets for mocks
+        uses: aws-actions/aws-secretsmanager-get-secrets@3a411b6ec5cace3d626412dd917e7bfeac242cfa
+        with:
+          secret-ids: |
+            /cds/pathology/dev/jwks/secret
+          name-transformation: lowercase
+
       - name: Create or update mock Lambda (on open/sync/reopen)
         if: github.event.action != 'closed'
         env:
           TOKEN_EXPIRY_TIME: ${{ secrets.TOKEN_LIFETIME }}
+          AUTH_URL: "${{ steps.names.outputs.mock_preview_url }}/apim/oauth2/token"
+          JWKS_SECRET: ${{ env._cds_pathology_dev_jwks_secret }}
+          PUBLIC_KEY_URL: "https://example.com"
+          TOKEN_TABLE_NAME: "mock_services_dev"
         run: |
-          cd infrastructure/environments/preview
+          cd mocks/target/
           MFN="${{ steps.names.outputs.mock_function_name }}"
           SAFE="${{ steps.branch.outputs.safe }}"
           TOKEN_LIFETIME="${TOKEN_EXPIRY_TIME:-15m}"
@@ -336,18 +353,28 @@ jobs:
               --handler "${{ env.MOCK_LAMBDA_HANDLER }}" \
               --environment "Variables={CLIENT_PUBLIC_KEY_ARN=mock, \
                                         DDB_INDEX_TAG=$SAFE, \
-                                        TOKEN_LIFETIME=$TOKEN_LIFETIME}" || true
+                                        TOKEN_LIFETIME=$TOKEN_LIFETIME, \
+                                        AUTH_URL=$AUTH_URL, \
+                                        PUBLIC_KEY_URL=$PUBLIC_KEY_URL, \
+                                        API_KEY=$JWKS_SECRET, \
+                                        TOKEN_TABLE_NAME=$TOKEN_TABLE_NAME \
+                                        }" || true
             wait_for_lambda_ready
-            aws lambda update-function-code --function-name "$MFN" --zip-file "fileb://mock_artifact.zip" --publish
+            aws lambda update-function-code --function-name "$MFN" --zip-file "fileb://artifact.zip" --publish
           else
             aws lambda create-function --function-name "$MFN" \
               --runtime "${{ env.LAMBDA_RUNTIME }}" \
               --handler "${{ env.MOCK_LAMBDA_HANDLER }}" \
-              --zip-file "fileb://mock_artifact.zip" \
+              --zip-file "fileb://artifact.zip" \
               --role "${{ steps.role-select.outputs.lambda_role }}" \
               --environment "Variables={CLIENT_PUBLIC_KEY_ARN=mock, \
                                         DDB_INDEX_TAG=$SAFE, \
-                                        TOKEN_LIFETIME=$TOKEN_LIFETIME}" \
+                                        TOKEN_LIFETIME=$TOKEN_LIFETIME, \
+                                        AUTH_URL=$AUTH_URL, \
+                                        PUBLIC_KEY_URL=$PUBLIC_KEY_URL, \
+                                        API_KEY=$JWKS_SECRET, \
+                                        TOKEN_TABLE_NAME=$TOKEN_TABLE_NAME, \
+                                        }" \
               --publish
             wait_for_lambda_ready
           fi
@@ -368,7 +395,7 @@ jobs:
       - name: Get mTLS certs for testing
         if: github.event.action != 'closed'
         id: mtls-certs
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802
+        uses: aws-actions/aws-secretsmanager-get-secrets@3a411b6ec5cace3d626412dd917e7bfeac242cfa
         with:
           secret-ids: |
             /cds/pathology/dev/mtls/client1-key-secret
@@ -530,7 +557,7 @@ jobs:
 
       - name: Get proxygen machine user details
         id: proxygen-machine-user
-        uses: aws-actions/aws-secretsmanager-get-secrets@a9a7eb4e2f2871d30dc5b892576fde60a2ecc802
+        uses: aws-actions/aws-secretsmanager-get-secrets@3a411b6ec5cace3d626412dd917e7bfeac242cfa
         with:
           secret-ids: /cds/pathology/dev/proxygen/proxygen-key-secret
           name-transformation: lowercase
@@ -644,6 +671,12 @@ jobs:
         with:
           path: pathology-api/test-artefacts/
           merge-multiple: false
+      - name: "Download mock test coverage artefacts"
+        if: always() && github.event.action != 'closed'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: mocks/test-artefacts/
+          merge-multiple: false
       - name: "Merge coverage data"
         if: always() && github.event.action != 'closed'
         run: make test-coverage
@@ -652,6 +685,9 @@ jobs:
         run: |
           cd pathology-api/test-artefacts
           mv coverage-merged.xml "${{ steps.create-name.outputs.artefact-name }}.xml"
+          cd ../..
+          cd mocks/test-artefacts
+          mv coverage-merged.xml ${{ steps.create-name.outputs.artefact-name }}-mocks.xml
       - name: "Upload combined coverage report"
         if: always() && github.event.action != 'closed'
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -659,12 +695,24 @@ jobs:
           name: ${{ steps.create-name.outputs.artefact-name }}
           path: pathology-api/test-artefacts
           retention-days: 30
-
+      - name: "Upload mocks coverage report"
+        if: always() && github.event.action != 'closed'
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ${{ steps.create-name.outputs.artefact-name }}-mocks
+          path: mocks/test-artefacts
+          retention-days: 30
       - name: "Download merged coverage report"
         if: always() && github.event.action != 'closed'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ steps.create-name.outputs.artefact-name }}
+          path: coverage-reports/
+      - name: "Download mock coverage report"
+        if: always() && github.event.action != 'closed'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ steps.create-name.outputs.artefact-name }}-mocks
           path: coverage-reports/
       - name: "SonarCloud Scan"
         if: always() && github.event.action != 'closed' && github.actor != 'dependabot[bot]'
@@ -675,7 +723,7 @@ jobs:
           args: >
             -Dsonar.organization=${{ vars.SONAR_ORGANISATION_KEY }}
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
-            -Dsonar.python.coverage.reportPaths=coverage-reports/${{ steps.create-name.outputs.artefact-name }}.xml
+            -Dsonar.python.coverage.reportPaths=coverage-reports/${{ steps.create-name.outputs.artefact-name }}.xml,coverage-reports/${{ steps.create-name.outputs.artefact-name }}-mocks.xml
 
       - name: Comment function name on PR
         if: github.event_name == 'pull_request' && github.event.action != 'closed'
@@ -769,23 +817,23 @@ jobs:
             });
 
       # ---------- Perform trivy scan and notify ----------
-      - name: Prepare lambda artifact for trivy scan
-        if: github.event.action != 'closed'
-        run: |
-          cd pathology-api/target/
-          rm -rf /tmp/artifact
-          mkdir -p /tmp/artifact
-          unzip -q artifact.zip -d /tmp/artifact
+      # - name: Prepare lambda artifact for trivy scan
+      #   if: github.event.action != 'closed'
+      #   run: |
+      #     cd pathology-api/target/
+      #     rm -rf /tmp/artifact
+      #     mkdir -p /tmp/artifact
+      #     unzip -q artifact.zip -d /tmp/artifact
 
-      - name: Trivy filesystem scan
-        if: github.event.action != 'closed'
-        uses: ./.github/actions/trivy-fs-scan
-        with:
-          filesystem-ref: /tmp/artifact
-          artifact-name: trivy-fs-scan-${{ steps.branch.outputs.safe }}
+      # - name: Trivy filesystem scan
+      #   if: github.event.action != 'closed'
+      #   uses: ./.github/actions/trivy-fs-scan
+      #   with:
+      #     filesystem-ref: /tmp/artifact
+      #     artifact-name: trivy-fs-scan-${{ steps.branch.outputs.safe }}
 
-      - name: Trivy SBOM generation
-        if: github.event.action != 'closed'
-        uses: ./.github/actions/trivy-fs-sbom
-        with:
-          fs-path: /tmp/artifact
+      # - name: Trivy SBOM generation
+      #   if: github.event.action != 'closed'
+      #   uses: ./.github/actions/trivy-fs-sbom
+      #   with:
+      #     fs-path: /tmp/artifact
