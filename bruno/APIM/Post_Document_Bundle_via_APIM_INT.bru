@@ -1,0 +1,79 @@
+meta {
+  name: Post Document Bundle via APIM - INT
+  type: http
+  seq: 4
+}
+
+post {
+  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pri-{{PR_NUMBER}}/FHIR/R4/Bundle
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/fhir+json
+}
+
+body:json {
+  {
+    "resourceType": "Bundle",
+    "type": "document",
+    "entry": [
+      {
+        "fullUrl": "composition",
+        "resource": {
+          "resourceType": "Composition",
+          "extension": [
+            {
+              "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+              "valueReference": {
+                "reference": "servicerequest"
+              }
+            }
+          ],
+          "subject": {
+            "identifier": {
+              "system": "https://fhir.nhs.uk/Id/nhs-number",
+              "value": "test-nhs-number"
+            }
+          }
+        }
+      },
+      {
+        "fullUrl": "servicerequest",
+        "resource": {
+          "resourceType": "ServiceRequest",
+          "requester": {
+            "reference": "practitionerrole"
+          }
+        }
+      },
+      {
+        "fullUrl": "practitionerrole",
+        "resource": {
+          "resourceType": "PractitionerRole",
+          "organization": {
+            "reference": "organization"
+          }
+        }
+      },
+      {
+        "fullUrl": "organization",
+        "resource": {
+          "resourceType": "Organization",
+          "identifier": [
+            {
+              "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+              "value": "testOrg"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

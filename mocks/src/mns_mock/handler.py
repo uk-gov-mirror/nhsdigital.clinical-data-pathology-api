@@ -24,7 +24,7 @@ _logger = get_logger(__name__)
 
 class MNSResponse(TypedDict):
     status_code: int
-    response: dict[str, Any]
+    response: dict[str, Any] | None
 
 
 class EventItem(BaseMockItem):
@@ -35,27 +35,25 @@ class EventItem(BaseMockItem):
 type RequestHandler = Callable[[], MNSResponse]
 
 
-def _create_operation_outcome(
-    status_code: int, response: dict[str, Any]
+def _create_response(
+    status_code: int, response: dict[str, Any] | None = None
 ) -> MNSResponse:
     return {"status_code": status_code, "response": response}
 
 
 def _raise_validation_error(event_type: str) -> RequestHandler:
-    return lambda: _create_operation_outcome(
-        400, {"validationErrors": {"type": event_type}}
-    )
+    return lambda: _create_response(400, {"validationErrors": {"type": event_type}})
 
 
 def _raise_authentication_error(fault_string: str, error_code: str) -> RequestHandler:
-    return lambda: _create_operation_outcome(
+    return lambda: _create_response(
         401,
         {"fault": {"faultstring": fault_string, "detail": {"errorcode": error_code}}},
     )
 
 
-def _raise_server_error(status_code: int, errors: str) -> RequestHandler:
-    return lambda: _create_operation_outcome(status_code, {"errors": errors})
+def _raise_error(status_code: int, errors: str) -> RequestHandler:
+    return lambda: _create_response(status_code, {"errors": errors})
 
 
 REQUEST_HANDLERS: dict[str, RequestHandler] = {
@@ -65,7 +63,12 @@ REQUEST_HANDLERS: dict[str, RequestHandler] = {
     "MNS_AUTHENTICATION_ERROR": _raise_authentication_error(
         "Invalid access token", "oauth.v2.InvalidAccessToken"
     ),
-    "MNS_SERVER_ERROR": _raise_server_error(500, "Internal server error"),
+    "MNS_AUTHORIZATION_ERROR": _raise_error(
+        403, "User is not authorized to handle the requested event type"
+    ),
+    "MNS_SERVER_ERROR": _raise_error(500, "Internal server error"),
+    "MNS_BAD_GATEWAY_ERROR": lambda: _create_response(502),
+    "MNS_GATEWAY_TIMEOUT_ERROR": lambda: _create_response(504),
 }
 
 
@@ -102,11 +105,14 @@ def _find_events_in_table(subject: str) -> list[EventItem]:
 
 
 def _with_default_headers(response: MNSResponse) -> Response[str]:
-    return Response(
-        body=json.dumps(response["response"]),
-        status_code=response["status_code"],
-        headers={"Content-Type": "application/fhir+json"},
-    )
+    if response["response"] is not None:
+        body = json.dumps(response["response"])
+        headers = {"Content-Type": "application/fhir+json"}
+    else:
+        body = None
+        headers = None
+
+    return Response(body=body, status_code=response["status_code"], headers=headers)
 
 
 @mns_routes.post("/mns/events")
@@ -122,7 +128,7 @@ def create_event() -> Response[str]:
     except json.JSONDecodeError as err:
         _logger.error("Error decoding JSON payload. Error: %s", err)
         return _with_default_headers(
-            _create_operation_outcome(
+            _create_response(
                 400, {"validationErrors": {"type": "Invalid payload provided"}}
             )
         )
@@ -130,9 +136,7 @@ def create_event() -> Response[str]:
     if not payload:
         _logger.error("No payload provided.")
         return _with_default_headers(
-            _create_operation_outcome(
-                400, {"validationErrors": {"type": "No payload provided"}}
-            )
+            _create_response(400, {"validationErrors": {"type": "No payload provided"}})
         )
 
     _logger.debug(

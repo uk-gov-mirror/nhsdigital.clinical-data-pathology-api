@@ -7,6 +7,7 @@ from typing import Any, Literal
 import pytest
 from pathology_api.fhir.r4.resources import (
     Bundle,
+    OperationOutcome,
 )
 from pydantic import BaseModel, HttpUrl
 
@@ -879,6 +880,51 @@ class TestBundleEndpoint:
                 }
             ],
         }
+
+    @pytest.mark.parametrize(
+        ("subject"),
+        [
+            "MNS_VALIDATION_ERROR",
+            "MNS_AUTHENTICATION_ERROR",
+            "MNS_SERVER_ERROR",
+            "MNS_AUTHORIZATION_ERROR",
+            "MNS_BAD_GATEWAY_ERROR",
+            "MNS_GATEWAY_TIMEOUT_ERROR",
+        ],
+    )
+    def test_unexpected_mns_response(
+        self,
+        subject: str,
+        client: Client,
+        build_valid_test_result: Callable[[str, str], Bundle],
+    ) -> None:
+        bundle = build_valid_test_result(subject, "ods_code")
+        response = client.send(
+            data=bundle.model_dump_json(by_alias=True),
+            path="FHIR/R4/Bundle",
+            request_method="POST",
+            headers={"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
+        )
+
+        assert response.status_code == 500
+        assert response.headers["Content-Type"] == "application/fhir+json"
+        assert (
+            response.headers["X-Correlation-ID"]
+            == "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"
+        )
+
+        assert response.status_code == 500
+
+        response_data = response.json()
+        operation_outcome = OperationOutcome.model_validate(response_data)
+
+        issue: OperationOutcome.Issue = {
+            "severity": "fatal",
+            "code": "exception",
+            "diagnostics": "Failed to publish an event",
+        }
+
+        assert operation_outcome.issue == [issue]
 
 
 @pytest.mark.remote_only

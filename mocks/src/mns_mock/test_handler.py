@@ -124,6 +124,14 @@ class TestMNSMockHandler:
                 "MNS_SERVER_ERROR",
                 {"status_code": 500, "response": {"errors": "Internal server error"}},
             ),
+            (
+                "MNS_BAD_GATEWAY_ERROR",
+                {"status_code": 502, "response": None},
+            ),
+            (
+                "MNS_GATEWAY_TIMEOUT_ERROR",
+                {"status_code": 504, "response": None},
+            ),
         ],
     )
     def test_handle_post_request_error_responses(
@@ -195,6 +203,29 @@ class TestMNSMockHandler:
         assert response["statusCode"] == 200
         assert response["headers"] == {"Content-Type": "application/fhir+json"}
         assert json.loads(response["body"]) == {"id": basic_event_payload["id"]}
+
+    @patch("mns_mock.handler.check_authenticated", new=MagicMock(return_value=None))
+    def test_create_event_without_response_payload(
+        self,
+        basic_event_payload: dict[str, Any],
+        lambda_app: APIGatewayHttpResolver,
+    ) -> None:
+        payload = basic_event_payload | {"subject": "MNS_BAD_GATEWAY_ERROR"}
+
+        event = self._create_test_event(
+            body=json.dumps(payload),
+            path_params="mns/events",
+            request_method="POST",
+            headers={"Authorization": "Bearer token"},
+        )
+        context = LambdaContext()
+
+        with patch("mns_mock.handler.storage_helper"):
+            response = lambda_app.resolve(event, context)
+
+        assert response["statusCode"] == 502
+        assert not response["headers"]
+        assert response["body"] is None
 
     @patch("mns_mock.handler.check_authenticated")
     def test_create_event_fails_authentication(
