@@ -87,22 +87,18 @@ def handle_post_request(payload: dict[str, Any]) -> MNSResponse:
     return {"status_code": 200, "response": {"id": payload["id"]}}
 
 
-def handle_get_request(subject: str) -> MNSResponse:
-
-    table_item = _get_event_from_table(subject)
-    event = table_item["event"]
-
-    return {"status_code": 200, "response": event}
+def handle_search(subject: str) -> MNSResponse:
+    events = [item["event"] for item in _find_events_in_table(subject)]
+    return {"status_code": 200, "response": {"events": events}}
 
 
 def _write_event_to_table(event: EventItem) -> None:
     storage_helper.put_item(event)
 
 
-def _get_event_from_table(subject: str) -> EventItem:
+def _find_events_in_table(subject: str) -> list[EventItem]:
     expression = Attr("subject").eq(subject)
-    item = storage_helper.find_items(expression)[0]
-    return cast("EventItem", item)
+    return [cast("EventItem", item) for item in storage_helper.find_items(expression)]
 
 
 def _with_default_headers(response: MNSResponse) -> Response[str]:
@@ -153,14 +149,23 @@ def create_event() -> Response[str]:
     return _with_default_headers(response)
 
 
-@mns_routes.get("/mns/mock/event/<subject>")
-def get_event(subject: str) -> Response[str]:
+@mns_routes.get("/mns/mock/event")
+def search_events() -> Response[str]:
+    query_parameters = mns_routes.current_event.query_string_parameters
+    if "subject" not in query_parameters:
+        return Response(status_code=400, body="No subject provided with request")
+
+    subject = query_parameters["subject"]
     _logger.debug("Get an event endpoint called with the subject: %s", subject)
 
     try:
-        response = handle_get_request(subject)
+        response = handle_search(subject)
     except Exception as err:
         _logger.exception("Error handling MNS Mock request")
         return Response(status_code=500, body=json.dumps({"error": str(err)}))
 
-    return _with_default_headers(response)
+    return Response(
+        status_code=response["status_code"],
+        body=json.dumps(response["response"]),
+        content_type="application/json",
+    )

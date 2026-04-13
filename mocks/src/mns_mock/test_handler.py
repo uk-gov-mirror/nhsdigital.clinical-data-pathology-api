@@ -57,6 +57,7 @@ class TestMNSMockHandler:
         self,
         body: str | None = None,
         path_params: str | None = None,
+        query_params: dict[str, str] | None = None,
         request_method: str | None = None,
         headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
@@ -75,6 +76,7 @@ class TestMNSMockHandler:
             "rawPath": f"/{path_params}",
             "rawQueryString": "",
             "pathParameters": {"proxy": path_params},
+            "queryStringParameters": query_params,
         }
 
     @patch("mns_mock.handler.storage_helper")
@@ -137,7 +139,7 @@ class TestMNSMockHandler:
         assert response == expected_response
 
     @patch("mns_mock.handler.storage_helper")
-    def test_handle_get_request_returns_event(
+    def test_handle_search_returns_event(
         self,
         mock_storage: MagicMock,
         basic_event_payload: dict[str, Any],
@@ -153,20 +155,25 @@ class TestMNSMockHandler:
             }
         ]
 
-        response = handler.handle_get_request(NHS_NUMBER)
+        response = handler.handle_search(NHS_NUMBER)
 
-        assert response == {"status_code": 200, "response": basic_event_payload}
+        assert response == {
+            "status_code": 200,
+            "response": {"events": [basic_event_payload]},
+        }
 
     @patch("mns_mock.handler.storage_helper")
-    def test_handle_get_request_raises_error_when_no_event_found(
+    def test_handle_search_raises_error_when_no_event_found(
         self,
         mock_storage: MagicMock,
         handler: ModuleType,
     ) -> None:
         mock_storage.find_items.return_value = []
 
-        with pytest.raises(IndexError):
-            handler.handle_get_request(NHS_NUMBER)
+        assert handler.handle_search(NHS_NUMBER) == {
+            "status_code": 200,
+            "response": {"events": []},
+        }
 
     @patch("mns_mock.handler.check_authenticated", new=MagicMock(return_value=None))
     def test_create_event_success(
@@ -271,7 +278,7 @@ class TestMNSMockHandler:
         assert json.loads(response["body"]) == {"error": "Unexpected error"}
 
     @patch("mns_mock.handler.storage_helper")
-    def test_get_event_success(
+    def test_find_events_success(
         self,
         mock_storage: MagicMock,
         basic_event_payload: dict[str, Any],
@@ -288,7 +295,8 @@ class TestMNSMockHandler:
         ]
 
         event = self._create_test_event(
-            path_params=f"mns/mock/event/{NHS_NUMBER}",
+            path_params="mns/mock/event",
+            query_params={"subject": NHS_NUMBER},
             request_method="GET",
         )
         context = LambdaContext()
@@ -296,11 +304,11 @@ class TestMNSMockHandler:
         response = lambda_app.resolve(event, context)
 
         assert response["statusCode"] == 200
-        assert response["headers"] == {"Content-Type": "application/fhir+json"}
-        assert json.loads(response["body"]) == basic_event_payload
+        assert response["headers"] == {"Content-Type": "application/json"}
+        assert json.loads(response["body"]) == {"events": [basic_event_payload]}
 
     @patch("mns_mock.handler.storage_helper")
-    def test_get_event_not_found(
+    def test_find_events_not_found(
         self,
         mock_storage: MagicMock,
         lambda_app: APIGatewayHttpResolver,
@@ -308,12 +316,46 @@ class TestMNSMockHandler:
         mock_storage.find_items.return_value = []
 
         event = self._create_test_event(
-            path_params=f"mns/mock/event/{NHS_NUMBER}",
+            path_params="mns/mock/event",
+            query_params={"subject": NHS_NUMBER},
             request_method="GET",
         )
         context = LambdaContext()
 
         response = lambda_app.resolve(event, context)
 
+        assert response["statusCode"] == 200
+        assert json.loads(response["body"]) == {"events": []}
+
+    def test_find_events_without_subject(
+        self, lambda_app: APIGatewayHttpResolver
+    ) -> None:
+        event = self._create_test_event(
+            path_params="mns/mock/event",
+            request_method="GET",
+        )
+        context = LambdaContext()
+
+        response = lambda_app.resolve(event, context)
+
+        assert response["statusCode"] == 400
+        assert response["body"] == "No subject provided with request"
+
+    @patch("mns_mock.handler.storage_helper")
+    def test_find_events_raises_exception(
+        self,
+        storage_helper_mock: MagicMock,
+        lambda_app: APIGatewayHttpResolver,
+    ) -> None:
+        event = self._create_test_event(
+            path_params="mns/mock/event",
+            query_params={"subject": NHS_NUMBER},
+            request_method="GET",
+        )
+        context = LambdaContext()
+
+        storage_helper_mock.find_items.side_effect = Exception("Unexpected error")
+        response = lambda_app.resolve(event, context)
+
         assert response["statusCode"] == 500
-        assert json.loads(response["body"]) == {"error": "list index out of range"}
+        assert json.loads(response["body"]) == {"error": "Unexpected error"}
