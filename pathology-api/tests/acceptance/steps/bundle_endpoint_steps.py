@@ -1,6 +1,8 @@
 """Step definitions for pathology API bundle endpoint feature."""
 
+import json
 from collections.abc import Callable
+from typing import Any
 
 import requests
 from pathology_api.fhir.r4.resources import (
@@ -9,7 +11,7 @@ from pathology_api.fhir.r4.resources import (
 )
 from pytest_bdd import given, parsers, then, when
 
-from tests.acceptance.conftest import ResponseContext
+from tests.acceptance.conftest import ResponseContext, TestContext
 from tests.conftest import Client
 
 BUNDLE_ENDPOINT = "FHIR/R4/Bundle"
@@ -32,7 +34,8 @@ def step_api_is_running(client: Client) -> None:
 def step_send_valid_bundle(
     client: Client,
     response_context: ResponseContext,
-    build_valid_test_result: Callable[[str, str], Bundle],
+    test_context: TestContext,
+    build_full_test_result: Callable[[str, str], str],
 ) -> None:
     """
     Send a valid Bundle to the API.
@@ -40,16 +43,18 @@ def step_send_valid_bundle(
     Args:
         client: Test client
         response_context: Context to store the response
-        build_valid_test_result: Function to build a valid test result
+        test_context: Context to store test data
+        build_full_test_result: Function to build a full test result
     """
 
+    test_result = build_full_test_result("nhs_number_1", "ods_code")
     response_context.response = client.send(
         path=BUNDLE_ENDPOINT,
         request_method="POST",
-        data=build_valid_test_result("nhs_number_1", "ods_code").model_dump_json(
-            by_alias=True, exclude_none=True
-        ),
+        data=test_result,
     )
+
+    test_context.sent_request = test_result
 
 
 @when("I send an invalid Bundle to the Pathology API")
@@ -123,6 +128,30 @@ def step_check_status_code(
         f"got {response.status_code}"
     )
 
+@then("the response should include the created test result")
+def step_check_response_includes_created_result(
+    response_context: ResponseContext, test_context: TestContext
+) -> None:
+    """Verify the response includes the created test result.
+
+    Args:
+        response_context: Context containing the response
+        test_context: Context containing the sent request data
+    """
+    response = _validate_response_set(response_context)
+
+    assert test_context.sent_request is not None, "Sent request has not been set."
+
+    expected_data = json.loads(test_context.sent_request)
+    response_data = response.json()
+
+    print(f"Expected data: {expected_data}")
+    print(f"Response data: {response_data}")
+
+    _assert_content(expected_data, response_data)
+
+    assert response_data.get("id") is not None
+    assert response_data.get("meta", {}).get("lastUpdated") is not None
 
 @then(parsers.cfparse('the response should contain "{expected_text}"'))
 def step_check_response_contains(
@@ -165,3 +194,13 @@ def step_check_response_contains_valid_bundle(
 def _validate_response_set(response_context: ResponseContext) -> requests.Response:
     assert response_context.response is not None, "Response has not been set."
     return response_context.response
+
+def _assert_content(expected: Any, actual: Any) -> None:
+    if isinstance(expected, dict):
+        for k, v in expected.items():
+            _assert_content(v, actual.get(k))
+    elif isinstance(expected, list):
+        for i, item in enumerate(expected):
+            _assert_content(item, actual[i])
+    else:
+        assert expected == actual, f"Expected {expected}, got {actual}"

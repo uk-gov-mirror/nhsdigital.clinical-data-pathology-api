@@ -12,6 +12,7 @@ Feature: pathology Bundle API
     When I send a valid Bundle to the Pathology API
     Then the response status code should be 200
     And the response should contain a valid "document" Bundle
+    And the response should include the created test result
 
   Scenario: Sending an invalid bundle
     When I send an invalid Bundle to the Pathology API

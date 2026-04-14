@@ -1,5 +1,4 @@
 import datetime
-import uuid
 from abc import ABC
 from dataclasses import dataclass
 from typing import Annotated, Any, ClassVar
@@ -107,25 +106,13 @@ class UnknownIdentifier(Identifier, validate_system=False):
     """Provides a fallback Identifier type for an unknown system."""
 
 
-class UUIDIdentifier(Identifier, expected_system="https://tools.ietf.org/html/rfc4122"):
-    """A UUID identifier utilising the standard RFC 4122 system."""
-
-    @classmethod
-    def create_with_uuid(cls, value: uuid.UUID | None = None) -> "UUIDIdentifier":
-        """Create a UUIDIdentifier with the provided UUID value."""
-        return cls(
-            value=str(value or uuid.uuid4()),
-            system=cls.expected_system,
-        )
-
-
 class PatientIdentifier(
     Identifier, expected_system="https://fhir.nhs.uk/Id/nhs-number"
 ):
     """A FHIR R4 Patient Identifier utilising the NHS Number system."""
 
     @classmethod
-    def from_nhs_number(cls, nhs_number: str) -> "PatientIdentifier":
+    def create_with(cls, nhs_number: str) -> "PatientIdentifier":
         """Create a PatientIdentifier from an NHS number."""
         return cls(value=nhs_number, system=cls.expected_system)
 
@@ -144,6 +131,7 @@ class OrganizationIdentifier(
 @dataclass(frozen=True)
 class LogicalReference[T: Identifier]:
     identifier: T
+    reference: str | None = None
 
 
 @dataclass(frozen=True)
