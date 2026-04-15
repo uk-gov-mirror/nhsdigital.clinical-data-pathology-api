@@ -19,7 +19,8 @@ dependencies = [
 packages = [
   {include = "apim_mock", from = "src"},
   {include = "pdm_mock", from = "src"},
-  {include = "common", from = "src"}
+  {include = "common", from = "src"},
+  {include = "mns_mock", from = "src"}
 ]
 
 [tool.coverage.run]

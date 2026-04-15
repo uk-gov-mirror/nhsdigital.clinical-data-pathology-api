@@ -10,6 +10,7 @@ from aws_lambda_powertools.event_handler import (
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from common.logging import get_logger
+from mns_mock.handler import mns_routes
 from pdm_mock.handler import pdm_routes
 
 _logger = get_logger(__name__)
@@ -17,6 +18,7 @@ _logger = get_logger(__name__)
 app = APIGatewayHttpResolver()
 app.include_router(apim_routes)
 app.include_router(pdm_routes)
+app.include_router(mns_routes)
 
 type _ExceptionHandler[T: Exception] = Callable[[T], Response[str]]
 

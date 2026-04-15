@@ -358,7 +358,8 @@ jobs:
                                         PUBLIC_KEY_URL=$PUBLIC_KEY_URL, \
                                         API_KEY=$JWKS_SECRET, \
                                         TOKEN_TABLE_NAME=$DYNAMODB_TABLE_NAME, \
-                                        PDM_TABLE_NAME=$DYNAMODB_TABLE_NAME \
+                                        PDM_TABLE_NAME=$DYNAMODB_TABLE_NAME, \
+                                        MNS_TABLE_NAME=$DYNAMODB_TABLE_NAME \
                                         }" || true
             wait_for_lambda_ready
             aws lambda update-function-code --function-name "$MFN" --zip-file "fileb://artifact.zip" --publish
@@ -375,7 +376,8 @@ jobs:
                                         PUBLIC_KEY_URL=$PUBLIC_KEY_URL, \
                                         API_KEY=$JWKS_SECRET, \
                                         TOKEN_TABLE_NAME=$DYNAMODB_TABLE_NAME, \
-                                        PDM_TABLE_NAME=$DYNAMODB_TABLE_NAME \
+                                        PDM_TABLE_NAME=$DYNAMODB_TABLE_NAME, \
+                                        MNS_TABLE_NAME=$DYNAMODB_TABLE_NAME \
                                         }" \
               --publish
             wait_for_lambda_ready
