@@ -1,0 +1,27 @@
+meta {
+  name: Retrieve Document from mock
+  type: http
+  seq: 4
+}
+
+get {
+  url: http://localhost:5005/pdm/FHIR/R4/Bundle/7abe3c91-19d8-42b8-ad76-7ead70cd70ba
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Request-ID: Set By Script
+  X-Correlation-ID: Set By Script
+}
+
+script:pre-request {
+  const crypto = require("crypto");
+  req.setHeader('X-Request-ID', crypto.randomUUID())
+  req.setHeader('X-Correlation-ID', crypto.randomUUID())
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
