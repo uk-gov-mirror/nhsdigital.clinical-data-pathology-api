@@ -29,7 +29,7 @@ class PDMResponse(TypedDict):
 
 
 class DocumentItem(BaseMockItem):
-    document: dict[str, Any]
+    document: str
 
 
 type RequestHandler = Callable[[], PDMResponse]
@@ -80,7 +80,8 @@ def _fetch_patient_from_payload(payload: dict[str, Any]) -> str | None:
         if (resource := entry.get("resource"))
         and resource.get("resourceType") == "Patient"
         and "identifier" in resource
-        and (patient := resource.get("identifier", {}).get("value"))
+        and len(resource["identifier"]) > 0
+        and (patient := resource.get("identifier")[0].get("value"))
     ]
 
     if not patient_values:
@@ -113,7 +114,7 @@ def handle_post_request(payload: dict[str, Any]) -> PDMResponse:
     item: DocumentItem = {
         "sessionId": document_id,
         "expiresAt": int(time()) + 600,
-        "document": created_document,
+        "document": json.dumps(created_document),
         "type": "pdm_document",
     }
 
@@ -125,7 +126,7 @@ def handle_post_request(payload: dict[str, Any]) -> PDMResponse:
 def handle_get_request(document_id: str) -> PDMResponse:
 
     table_item = _get_document_from_table(document_id)
-    document = table_item["document"]
+    document = json.loads(table_item["document"])
 
     return {"status_code": 200, "response": document}
 
