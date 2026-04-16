@@ -381,6 +381,27 @@ class TestBundleEndpoint:
                 id="composition with no subject",
             ),
             pytest.param(
+                lambda service_request_reference: {
+                    "resourceType": "Composition",
+                    "extension": [
+                        {
+                            "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                            "valueReference": {
+                                "reference": service_request_reference,
+                            },
+                        }
+                    ],
+                    "subject": {
+                        "identifier": {
+                            "system": "https://fhir.nhs.uk/Id/nhs-number",
+                            "value": "",
+                        }
+                    },
+                },
+                "Composition does not define a valid subject identifier",
+                id="composition with subject with empty identifier value",
+            ),
+            pytest.param(
                 lambda _: {
                     "resourceType": "Composition",
                     "subject": {
@@ -818,6 +839,21 @@ class TestBundleEndpoint:
                 "Organization (organization) does not define a supported identifier. "
                 "Supported system 'https://fhir.nhs.uk/Id/ods-organization-code'",
                 id="organization with unknown identifier system",
+            ),
+            pytest.param(
+                {
+                    "resourceType": "Organization",
+                    "identifier": [
+                        {
+                            "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                            "value": "",
+                        }
+                    ],
+                },
+                "Organization (organization) does not define a "
+                "supported identifier. "
+                r"Supported system 'https://fhir.nhs.uk/Id/ods-organization-code'",
+                id="organization with identifier with empty value",
             ),
         ],
     )
