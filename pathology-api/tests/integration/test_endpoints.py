@@ -45,6 +45,9 @@ class TestBundleEndpoint:
 
         assert response_bundle.meta is not None
         response_meta = response_bundle.meta
+
+        print(f"Response meta: {response_meta}")
+
         assert response_meta.last_updated is not None
         assert response_meta.version_id == "1"
 
