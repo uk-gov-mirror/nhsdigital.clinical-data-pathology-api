@@ -5,7 +5,11 @@ import pytest
 from aws_lambda_powertools import Logger
 
 from pathology_api.logging import LogProvider, _CorrelationIdFilter, get_logger
-from pathology_api.request_context import reset_correlation_id, set_correlation_id
+from pathology_api.request_context import (
+    CorrelationID,
+    reset_correlation_id,
+    set_correlation_id,
+)
 
 
 def _make_log_record() -> logging.LogRecord:
@@ -28,65 +32,79 @@ class TestCorrelationIdFilter:
     def test_filter_is_a_logging_filter_subclass(self) -> None:
         assert issubclass(_CorrelationIdFilter, logging.Filter)
 
-    def test_filter_always_returns_true(self) -> None:
+    def test_filter_always_returns_true(
+        self,
+    ) -> None:
+        set_correlation_id(full_id="abc-123-long", short_id="abc-123")
+
         f = _CorrelationIdFilter()
         record = _make_log_record()
         assert f.filter(record) is True
 
-    def test_filter_injects_empty_string_when_no_correlation_id_set(self) -> None:
+    def test_filter_raises_exception_when_no_correlation_id_set(self) -> None:
         f = _CorrelationIdFilter()
         record = _make_log_record()
-        f.filter(record)
-        assert record.correlation_id == ""  # type: ignore[attr-defined]
+        with pytest.raises(
+            ValueError, match="Correlation ID is not set in the current context."
+        ):
+            f.filter(record)
 
     def test_filter_injects_active_correlation_id(self) -> None:
         f = _CorrelationIdFilter()
         record = _make_log_record()
-        set_correlation_id("abc-123")
+        set_correlation_id(full_id="abc-123-long", short_id="abc-123")
         f.filter(record)
-        assert record.correlation_id == "abc-123"  # type: ignore[attr-defined]
+        assert record.correlation_id == "abc-123-long"  # type: ignore[attr-defined]
 
     def test_filter_injects_empty_string_after_correlation_id_reset(
         self,
     ) -> None:
         f = _CorrelationIdFilter()
-        set_correlation_id("to-be-cleared")
+        set_correlation_id(full_id="to-be-cleared-long", short_id="to-be-cleared")
         record_during = _make_log_record()
         f.filter(record_during)
-        assert record_during.correlation_id == "to-be-cleared"  # type: ignore[attr-defined]
+        assert record_during.correlation_id == "to-be-cleared-long"  # type: ignore[attr-defined]
         reset_correlation_id()
         record_after = _make_log_record()
-        f.filter(record_after)
-        assert record_after.correlation_id == ""  # type: ignore[attr-defined]
+        with pytest.raises(
+            ValueError, match="Correlation ID is not set in the current context."
+        ):
+            f.filter(record_after)
 
-    def test_filter_uses_get_correlation_id(self) -> None:
+    def test_filter_uses_full_correlation_id(self) -> None:
         f = _CorrelationIdFilter()
         record = _make_log_record()
+        correlation_id = CorrelationID(full_id="mocked-id-long", short_id="mocked-id")
         with patch(
-            "pathology_api.logging.get_correlation_id", return_value="mocked-id"
+            "pathology_api.logging.get_correlation_id",
+            return_value=correlation_id,
         ) as mock_fn:
             f.filter(record)
             mock_fn.assert_called_once()
-        assert record.correlation_id == "mocked-id"  # type: ignore[attr-defined]
+        assert record.correlation_id == "mocked-id-long"  # type: ignore[attr-defined]
 
     def test_filter_overwrites_existing_correlation_id_attribute(self) -> None:
         f = _CorrelationIdFilter()
         record = _make_log_record()
         record.correlation_id = "old-id"
-        set_correlation_id("new-id")
+        set_correlation_id(full_id="new-id-long", short_id="new-id")
         f.filter(record)
         reset_correlation_id()
-        assert record.correlation_id == "new-id"  # type: ignore[attr-defined]
+        assert record.correlation_id == "new-id-long"  # type: ignore[attr-defined]
 
     def test_filter_handles_different_correlation_id_values(self) -> None:
         f = _CorrelationIdFilter()
-        values = ["uuid-1234-5678", "X-Corr-99", "a" * 100]
+        values: list[dict[str, str]] = [
+            {"full_id": "uuid-1234-5678-long", "short_id": "uuid-1234"},
+            {"full_id": "X-Corr-99-long", "short_id": "X-Corr-99"},
+            {"full_id": "a" * 110, "short_id": "a" * 100},
+        ]
         for value in values:
             record = _make_log_record()
-            set_correlation_id(value)
+            set_correlation_id(**value)
             f.filter(record)
             reset_correlation_id()
-            assert record.correlation_id == value  # type: ignore[attr-defined]
+            assert record.correlation_id == value["full_id"]  # type: ignore[attr-defined]
 
 
 class TestLogProvider:
@@ -135,14 +153,17 @@ class TestGetLogger:
         get_logger("service-filter-applied")
         stdlib_logger = logging.getLogger("service-filter-applied")
         record = _make_log_record()
-        set_correlation_id("applied-id")
+        set_correlation_id(full_id="applied-id-long", short_id="applied-id")
         stdlib_logger.filter(record)
         reset_correlation_id()
-        assert record.correlation_id == "applied-id"  # type: ignore[attr-defined]
+        assert record.correlation_id == "applied-id-long"  # type: ignore[attr-defined]
 
     def test_correlation_id_filter_injects_empty_string_by_default(self) -> None:
         get_logger("service-filter-empty")
         stdlib_logger = logging.getLogger("service-filter-empty")
         record = _make_log_record()
-        stdlib_logger.filter(record)
-        assert record.correlation_id == ""  # type: ignore[attr-defined]
+
+        with pytest.raises(
+            ValueError, match="Correlation ID is not set in the current context."
+        ):
+            stdlib_logger.filter(record)

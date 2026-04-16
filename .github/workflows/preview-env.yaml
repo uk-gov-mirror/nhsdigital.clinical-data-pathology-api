@@ -182,7 +182,7 @@ jobs:
                                         APIM_MTLS_KEY_NAME=$MTLS_KEY, \
                                         APIM_KEY_ID=$KEY_ID, \
                                         APIM_TOKEN_URL=$MOCK_URL/apim/oauth2/token, \
-                                        PDM_BUNDLE_URL=$MOCK_URL/apim/check_auth, \
+                                        PDM_BUNDLE_URL=$MOCK_URL/pdm/FHIR/R4/Bundle, \
                                         MNS_EVENT_URL=$MOCK_URL/mns/events, \
                                         CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
                                         JWKS_SECRET_NAME=$JWKS_SECRET}" || true
@@ -205,7 +205,7 @@ jobs:
                                         APIM_MTLS_CERT_NAME=$MTLS_CERT, \
                                         APIM_MTLS_KEY_NAME=$MTLS_KEY, \
                                         APIM_TOKEN_URL=$MOCK_URL/apim/oauth2/token, \
-                                        PDM_BUNDLE_URL=$MOCK_URL/apim/check_auth, \
+                                        PDM_BUNDLE_URL=$MOCK_URL/pdm/FHIR/R4/Bundle, \
                                         MNS_EVENT_URL=$MOCK_URL/mns/events, \
                                         CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
                                         JWKS_SECRET_NAME=$JWKS_SECRET}" \

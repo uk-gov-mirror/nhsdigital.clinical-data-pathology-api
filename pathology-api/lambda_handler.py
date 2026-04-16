@@ -2,6 +2,7 @@ from collections.abc import Callable
 from functools import reduce
 from json import JSONDecodeError
 from typing import Any
+from uuid import uuid4
 
 import pydantic
 from aws_lambda_powertools.event_handler import (
@@ -14,7 +15,11 @@ from pathology_api.fhir.r4.resources import Bundle, OperationOutcome
 from pathology_api.handler import handle_request
 from pathology_api.logging import get_logger
 from pathology_api.mns import MnsException
-from pathology_api.request_context import reset_correlation_id, set_correlation_id
+from pathology_api.pdm import PdmException
+from pathology_api.request_context import (
+    reset_correlation_id,
+    set_correlation_id,
+)
 
 _logger = get_logger(__name__)
 _CORRELATION_ID_HEADER = "nhsd-correlation-id"
@@ -112,6 +117,15 @@ def handle_exception(exception: Exception) -> Response[str]:
     )
 
 
+@_exception_handler(PdmException)
+def handle_pdm_excepton(exception: PdmException) -> Response[str]:
+    _logger.exception("PDMClientError encountered: %s", exception)
+    return _with_default_headers(
+        status_code=500,
+        body=OperationOutcome.create_validation_error(exception.message),
+    )
+
+
 @_exception_handler(MnsException)
 def handle_mns_exception(exception: MnsException) -> Response[str]:
     _logger.exception("Failed to publish MNS event: %s", exception)
@@ -123,6 +137,13 @@ def handle_mns_exception(exception: MnsException) -> Response[str]:
 
 @app.get("/_status")
 def status() -> Response[str]:
+    pathology_api_correlation_id = str(uuid4())
+
+    set_correlation_id(
+        full_id=pathology_api_correlation_id,
+        short_id=pathology_api_correlation_id,
+    )
+
     _logger.debug("Status check endpoint called")
     return Response(
         status_code=200,
@@ -133,12 +154,20 @@ def status() -> Response[str]:
 
 @app.post("/FHIR/R4/Bundle")
 def post_result() -> Response[str]:
-    correlation_id = app.current_event.headers.get(_CORRELATION_ID_HEADER)
+    correlation_id_header = app.current_event.headers.get(_CORRELATION_ID_HEADER)
 
-    if not correlation_id:
+    pathology_api_correlation_id = str(uuid4())
+    if not correlation_id_header:
+        set_correlation_id(
+            full_id=pathology_api_correlation_id,
+            short_id=pathology_api_correlation_id,
+        )
         raise ValueError(f"Missing required header: {_CORRELATION_ID_HEADER}")
 
-    set_correlation_id(correlation_id)
+    set_correlation_id(
+        full_id=f"{correlation_id_header}.{pathology_api_correlation_id}",
+        short_id=pathology_api_correlation_id,
+    )
     _logger.debug("Post result endpoint called.")
 
     try:
@@ -155,11 +184,12 @@ def post_result() -> Response[str]:
 
     bundle = Bundle.model_validate(payload, by_alias=True)
 
-    response = handle_request(bundle)
+    pdm_response = handle_request(bundle)
 
-    return _with_default_headers(
+    return Response(
         status_code=200,
-        body=response,
+        headers={"Content-Type": "application/fhir+json", "etag": pdm_response.etag},
+        body=pdm_response.bundle.model_dump_json(by_alias=True, exclude_none=True),
     )
 
 

@@ -1,6 +1,6 @@
 import importlib
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from datetime import datetime, timezone
 from json import JSONDecodeError
 from typing import Any
@@ -8,6 +8,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import requests
+
+from pathology_api.request_context import reset_correlation_id, set_correlation_id
 
 mock_session = Mock()
 
@@ -36,6 +38,15 @@ with patch("pathology_api.environment.apim_authenticator") as apim_authenticator
 class TestMns:
     def setup_method(self) -> None:
         mock_session.reset_mock(return_value=True, side_effect=True)
+
+    @pytest.fixture(autouse=True)
+    def set_correlation_id_for_logger(self) -> Generator[None, None, None]:
+        set_correlation_id(
+            full_id="test_id_long",
+            short_id="test_id",
+        )
+        yield
+        reset_correlation_id()
 
     @patch("pathology_api.environment.values")
     @patch("pathology_api.mns.datetime")

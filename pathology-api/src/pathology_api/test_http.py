@@ -148,8 +148,9 @@ class TestSessionManager:
         with patch.object(
             requests.adapters.HTTPAdapter, "send", autospec=True
         ) as mock_send:
-            expected_correlation_id = "correaltion-id"
-            set_correlation_id(expected_correlation_id)
+            set_correlation_id(
+                full_id="test-correlation-id-long", short_id="test-correlation-id"
+            )
 
             expected_timeout = timedelta(seconds=30)
             adapter = SessionManager._Adapter(timeout=expected_timeout.total_seconds())  # noqa: SLF001 - Private access for testing
@@ -170,7 +171,7 @@ class TestSessionManager:
                 timeout=expected_timeout.total_seconds(),
             )
 
-            assert mock_request.headers["X-Correlation-ID"] == expected_correlation_id
+            assert mock_request.headers["X-Correlation-ID"] == "test-correlation-id"
 
     def test_adapter_overrides_defaults(self) -> None:
         with patch.object(
@@ -209,7 +210,9 @@ class TestSessionManager:
             mock_request = Mock()
             mock_request.headers = {}
 
-            set_correlation_id("test-correlation-id")
+            set_correlation_id(
+                full_id="test-correlation-id-long", short_id="test-correlation-id"
+            )
 
             with pytest.raises(requests.RequestException, match="request failed"):
                 adapter.send(mock_request)

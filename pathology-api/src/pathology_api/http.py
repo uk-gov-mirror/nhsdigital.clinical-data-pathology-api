@@ -43,7 +43,7 @@ class SessionManager:
         ) -> requests.Response:
             kwargs["timeout"] = self._timeout
             if "X-Correlation-ID" not in request.headers:
-                request.headers["X-Correlation-ID"] = get_correlation_id()
+                request.headers["X-Correlation-ID"] = get_correlation_id().short_id
 
             _logger.info(
                 "Sending HTTP request. method=%s url=%s headers=%s",

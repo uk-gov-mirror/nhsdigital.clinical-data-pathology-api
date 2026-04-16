@@ -158,7 +158,7 @@ class TestPDMMockHandler:
         response = handler.handle_post_request(basic_document_payload)
 
         assert response == {
-            "status_code": 200,
+            "status_code": 201,
             "response": {
                 "resourceType": "Bundle",
                 "id": "uuid4",
@@ -308,6 +308,7 @@ class TestPDMMockHandler:
         event = self._create_test_event(
             path_params="pdm/FHIR/R4/Bundle",
             request_method="POST",
+            headers={"X-Request-ID": "8c64be5f-3d7a-4b7b-8260-b716d122bdaf"},
             body=json.dumps({"test": "data"}),
         )
         context = LambdaContext()
@@ -315,7 +316,50 @@ class TestPDMMockHandler:
         with patch("boto3.resource"):
             response = lambda_app.resolve(event, context)
 
-        assert response["statusCode"] == 200
+        assert response["statusCode"] == 201
+
+    @pytest.mark.parametrize(
+        ("headers", "expected_issue_code", "expected_error_message"),
+        [
+            pytest.param({}, "required", "Missing X-Request-ID header"),
+            pytest.param(
+                {"X-Request-ID": "invalid"}, "invalid", "Invalid X-Request-ID header"
+            ),
+        ],
+    )
+    @patch("pdm_mock.handler.check_authenticated")
+    def test_pdm_invalid_or_missing_x_request_id(
+        self,
+        check_authenticated_mock: MagicMock,
+        headers: dict[str, str],
+        expected_issue_code: str,
+        expected_error_message: str,
+        lambda_app: APIGatewayHttpResolver,
+    ) -> None:
+        check_authenticated_mock.return_value = True
+
+        event = self._create_test_event(
+            path_params="pdm/FHIR/R4/Bundle",
+            request_method="POST",
+            headers=headers,
+            body=json.dumps({"test": "data"}),
+        )
+        context = LambdaContext()
+        response = lambda_app.resolve(event, context)
+
+        assert response["statusCode"] == 400
+        assert json.loads(response["body"]) == {
+            "resourceType": "OperationOutcome",
+            "issue": [
+                {
+                    "severity": "error",
+                    "code": expected_issue_code,
+                    "details": {
+                        "text": expected_error_message,
+                    },
+                }
+            ],
+        }
 
     @patch("pdm_mock.handler.check_authenticated")
     def test_pdm_mock_failed_authentication(
@@ -328,10 +372,11 @@ class TestPDMMockHandler:
         event = self._create_test_event(
             path_params="pdm/FHIR/R4/Bundle",
             request_method="POST",
+            headers={"X-Request-ID": "8c64be5f-3d7a-4b7b-8260-b716d122bdaf"},
             body=json.dumps({"test": "data"}),
         )
         context = LambdaContext()
-        with pytest.raises(AuthenticationError, match=""):
+        with pytest.raises(AuthenticationError, match=r"^$"):
             lambda_app.resolve(event, context)
 
     @patch("pdm_mock.handler.check_authenticated")
@@ -345,6 +390,7 @@ class TestPDMMockHandler:
         event = self._create_test_event(
             path_params="pdm/FHIR/R4/Bundle",
             request_method="POST",
+            headers={"X-Request-ID": "8c64be5f-3d7a-4b7b-8260-b716d122bdaf"},
             body="Invalid Body",
         )
         context = LambdaContext()
@@ -376,6 +422,7 @@ class TestPDMMockHandler:
         event = self._create_test_event(
             path_params="pdm/FHIR/R4/Bundle",
             request_method="POST",
+            headers={"X-Request-ID": "8c64be5f-3d7a-4b7b-8260-b716d122bdaf"},
             body="",
         )
         context = LambdaContext()
@@ -412,6 +459,7 @@ class TestPDMMockHandler:
         event = self._create_test_event(
             path_params="pdm/FHIR/R4/Bundle",
             request_method="POST",
+            headers={"X-Request-ID": "8c64be5f-3d7a-4b7b-8260-b716d122bdaf"},
             body=json.dumps({"test": "data"}),
         )
 

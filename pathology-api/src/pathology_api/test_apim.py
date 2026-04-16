@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import MagicMock, Mock, patch
@@ -8,9 +8,19 @@ import requests
 from jwt import InvalidKeyError
 
 from pathology_api.apim import ApimAuthenticationException, ApimAuthenticator
+from pathology_api.request_context import reset_correlation_id, set_correlation_id
 
 
 class TestApimAuthenticator:
+    @pytest.fixture(autouse=True)
+    def set_correlation_id_for_logger(self) -> Generator[None, None, None]:
+        set_correlation_id(
+            full_id="test_id_long",
+            short_id="test_id",
+        )
+        yield
+        reset_correlation_id()
+
     def setup_method(self) -> None:
         self.mock_session = Mock()
 

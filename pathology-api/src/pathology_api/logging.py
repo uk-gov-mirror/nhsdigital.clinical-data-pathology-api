@@ -10,7 +10,7 @@ class _CorrelationIdFilter(logging.Filter):
     """Injects the current correlation ID into every log record."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.correlation_id = get_correlation_id()
+        record.correlation_id = get_correlation_id().full_id
         return True
 
 

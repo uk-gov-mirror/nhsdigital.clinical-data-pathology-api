@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
@@ -15,6 +14,7 @@ from aws_lambda_powertools.event_handler import (
 from aws_lambda_powertools.event_handler.router import APIGatewayHttpRouter
 from common.logging import get_logger
 from common.storage_helper import BaseMockItem, StorageHelper
+from common.utils import check_valid_uuid4
 from requests import HTTPError
 
 JWT_ALGORITHMS = ["RS512"]
@@ -156,7 +156,7 @@ def _validate_assertions(assertions: dict[str, Any]) -> None:
     if not jti:
         raise ValueError("Missing 'jti' claim in client_assertion JWT")
 
-    if not _check_valid_uuid4(jti):
+    if not check_valid_uuid4(jti):
         raise ValueError("Invalid UUID4 value for jti")
 
     if not assertions.get("exp"):
@@ -169,13 +169,6 @@ def _validate_assertions(assertions: dict[str, Any]) -> None:
             "Invalid 'exp' claim in client_assertion JWT"
             " - more than 5 minutes in future"
         )
-
-
-def _check_valid_uuid4(string: str) -> bool:
-    uuid_regex = (
-        r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    )
-    return re.match(uuid_regex, string) is not None
 
 
 def _generate_random_token() -> str:
