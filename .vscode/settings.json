@@ -25,6 +25,19 @@
   "python.telemetry.enable": false,
   "debugpy.telemetry.enable": false,
   "python.experiments.enabled": false,
+  // Exclude generated files from analysis
+  "python.analysis.exclude": [
+    "**/target",
+    "**/__pycache__",
+    "**/dist",
+    "**/build",
+    "**/.venv",
+    "**/.mypy_cache",
+    "**/.pytest_cache",
+    "**/.ruff_cache",
+    "**/node_modules",
+    "**/.*"
+  ],
   // Enabling Ruff formatter for python files.
   "[python]": {
     "editor.formatOnSave": true,
@@ -64,5 +77,6 @@
     "projectKey": "NHSDigital_clinical-data-pathology-api"
   },
   // Disabling automatic port forwarding as the devcontainer should already have access to any required ports.
-  "remote.autoForwardPorts": false
+  "remote.autoForwardPorts": false,
+  "python-envs.defaultEnvManager": "ms-python.python:system"
 }

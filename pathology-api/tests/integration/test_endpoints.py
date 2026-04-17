@@ -1,31 +1,23 @@
 """Integration tests for the pathology API using pytest."""
 
 import json
+from collections.abc import Callable
 from typing import Any, Literal
 
 import pytest
-from pathology_api.fhir.r4.elements import LogicalReference, PatientIdentifier
-from pathology_api.fhir.r4.resources import Bundle, Composition
+from pathology_api.fhir.r4.resources import (
+    Bundle,
+)
 from pydantic import BaseModel, HttpUrl
 
 from tests.conftest import Client
 
 
 class TestBundleEndpoint:
-    def test_bundle_returns_200(self, client: Client) -> None:
-        bundle = Bundle.create(
-            type="document",
-            entry=[
-                Bundle.Entry(
-                    fullUrl="patient",
-                    resource=Composition.create(
-                        subject=LogicalReference(
-                            PatientIdentifier.from_nhs_number("nhs_number")
-                        )
-                    ),
-                )
-            ],
-        )
+    def test_bundle_returns_200(
+        self, client: Client, build_valid_test_result: Callable[[str, str], Bundle]
+    ) -> None:
+        bundle = build_valid_test_result("nhs_number", "ods_code")
 
         response = client.send(
             data=bundle.model_dump_json(by_alias=True),
@@ -106,67 +98,13 @@ class TestBundleEndpoint:
                     "type": "document",
                     "entry": [],
                 },
-                "Document must include a single Composition resource",
+                "Document must include a ServiceRequest resource",
                 id="empty entries list",
             ),
             pytest.param(
                 {"resourceType": "Bundle", "type": "document"},
-                "Document must include a single Composition resource",
+                "Document must include a ServiceRequest resource",
                 id="missing entries list",
-            ),
-            pytest.param(
-                {
-                    "resourceType": "Bundle",
-                    "type": "document",
-                    "entry": [
-                        {
-                            "fullUrl": "composition",
-                            "resource": {"resourceType": "Composition"},
-                        }
-                    ],
-                },
-                "Composition does not define a valid subject identifier",
-                id="composition with no subject",
-            ),
-            pytest.param(
-                {
-                    "resourceType": "Bundle",
-                    "type": "document",
-                    "entry": [
-                        {
-                            "fullUrl": "composition",
-                            "resource": {
-                                "resourceType": "Composition",
-                                "subject": {"identifier": {"value": "nhs_number"}},
-                            },
-                        }
-                    ],
-                },
-                "('entry', 0, 'resource', 'subject', 'identifier', 'system') "
-                "- Field required \n",
-                id="composition with subject but no system",
-            ),
-            pytest.param(
-                {
-                    "resourceType": "Bundle",
-                    "type": "document",
-                    "entry": [
-                        {
-                            "fullUrl": "composition",
-                            "resource": {
-                                "resourceType": "Composition",
-                                "subject": {
-                                    "identifier": {
-                                        "system": "https://fhir.nhs.uk/Id/nhs-number"
-                                    }
-                                },
-                            },
-                        }
-                    ],
-                },
-                "('entry', 0, 'resource', 'subject', 'identifier', 'value')"
-                " - Field required \n",
-                id="composition with subject but identifier has no value",
             ),
             pytest.param(
                 {
@@ -200,6 +138,32 @@ class TestBundleEndpoint:
                     "type": "document",
                     "entry": [
                         {
+                            "fullUrl": "organization",
+                            "resource": {
+                                "resourceType": "Organization",
+                                "identifier": [
+                                    {
+                                        "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                                        "value": "ods_code",
+                                    }
+                                ],
+                            },
+                        },
+                        {
+                            "fullUrl": "practitionerrole",
+                            "resource": {
+                                "resourceType": "PractitionerRole",
+                                "organization": {"reference": "organization"},
+                            },
+                        },
+                        {
+                            "fullUrl": "servicerequest",
+                            "resource": {
+                                "resourceType": "ServiceRequest",
+                                "requester": {"reference": "practitionerrole"},
+                            },
+                        },
+                        {
                             "fullUrl": "composition",
                             "resource": {
                                 "resourceType": "Composition",
@@ -228,6 +192,148 @@ class TestBundleEndpoint:
                 "Document must include a single Composition resource",
                 id="bundle with multiple compositions",
             ),
+            pytest.param(
+                {
+                    "resourceType": "Bundle",
+                    "type": "document",
+                    "entry": [
+                        {
+                            "fullUrl": "practitionerrole",
+                            "resource": {
+                                "resourceType": "PractitionerRole",
+                                "organization": {"reference": "organization"},
+                            },
+                        },
+                        {
+                            "fullUrl": "servicerequest",
+                            "resource": {
+                                "resourceType": "ServiceRequest",
+                                "requester": {"reference": "practitionerrole"},
+                            },
+                        },
+                        {
+                            "fullUrl": "composition",
+                            "resource": {
+                                "resourceType": "Composition",
+                                "subject": {
+                                    "identifier": {
+                                        "system": "https://fhir.nhs.uk/Id/nhs-number",
+                                        "value": "nhs_number",
+                                    }
+                                },
+                                "extension": [
+                                    {
+                                        "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                                        "valueReference": {
+                                            "reference": "servicerequest",
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    ],
+                },
+                "Document must include an Organization resource",
+                id="Missing Organization resource",
+            ),
+            pytest.param(
+                {
+                    "resourceType": "Bundle",
+                    "type": "document",
+                    "entry": [
+                        {
+                            "fullUrl": "organization",
+                            "resource": {
+                                "resourceType": "Organization",
+                                "identifier": [
+                                    {
+                                        "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                                        "value": "ods_code",
+                                    }
+                                ],
+                            },
+                        },
+                        {
+                            "fullUrl": "servicerequest",
+                            "resource": {
+                                "resourceType": "ServiceRequest",
+                                "requester": {"reference": "practitionerrole"},
+                            },
+                        },
+                        {
+                            "fullUrl": "composition",
+                            "resource": {
+                                "resourceType": "Composition",
+                                "subject": {
+                                    "identifier": {
+                                        "system": "https://fhir.nhs.uk/Id/nhs-number",
+                                        "value": "nhs_number",
+                                    }
+                                },
+                                "extension": [
+                                    {
+                                        "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                                        "valueReference": {
+                                            "reference": "servicerequest",
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    ],
+                },
+                "Document must include a PractitionerRole resource",
+                id="Missing PractitionerRole resource",
+            ),
+            pytest.param(
+                {
+                    "resourceType": "Bundle",
+                    "type": "document",
+                    "entry": [
+                        {
+                            "fullUrl": "organization",
+                            "resource": {
+                                "resourceType": "Organization",
+                                "identifier": [
+                                    {
+                                        "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                                        "value": "ods_code",
+                                    }
+                                ],
+                            },
+                        },
+                        {
+                            "fullUrl": "practitionerrole",
+                            "resource": {
+                                "resourceType": "PractitionerRole",
+                                "organization": {"reference": "organization"},
+                            },
+                        },
+                        {
+                            "fullUrl": "composition",
+                            "resource": {
+                                "resourceType": "Composition",
+                                "subject": {
+                                    "identifier": {
+                                        "system": "https://fhir.nhs.uk/Id/nhs-number",
+                                        "value": "nhs_number",
+                                    }
+                                },
+                                "extension": [
+                                    {
+                                        "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                                        "valueReference": {
+                                            "reference": "servicerequest",
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    ],
+                },
+                "Document must include a ServiceRequest resource",
+                id="Missing ServiceRequest resource",
+            ),
         ],
     )
     def test_invalid_payload_returns_error(
@@ -235,6 +341,530 @@ class TestBundleEndpoint:
     ) -> None:
         response = client.send(
             data=json.dumps(payload), request_method="POST", path="FHIR/R4/Bundle"
+        )
+        assert response.status_code == 400
+
+        response_data = response.json()
+        assert response_data == {
+            "resourceType": "OperationOutcome",
+            "issue": [
+                {
+                    "severity": "error",
+                    "code": "invalid",
+                    "diagnostics": expected_diagnostic,
+                }
+            ],
+        }
+
+    @pytest.mark.parametrize(
+        ("composition_builder", "expected_diagnostic"),
+        [
+            pytest.param(
+                lambda service_request_reference: {
+                    "resourceType": "Composition",
+                    "extension": [
+                        {
+                            "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                            "valueReference": {
+                                "reference": service_request_reference,
+                            },
+                        }
+                    ],
+                },
+                "Composition does not define a valid subject identifier",
+                id="composition with no subject",
+            ),
+            pytest.param(
+                lambda _: {
+                    "resourceType": "Composition",
+                    "subject": {
+                        "identifier": {
+                            "system": "https://fhir.nhs.uk/Id/nhs-number",
+                            "value": "nhs_number",
+                        }
+                    },
+                },
+                "Composition does not define a valid basedOn-order-or-requisition "
+                "extension",
+                id="composition with no extension",
+            ),
+            pytest.param(
+                lambda _: {
+                    "resourceType": "Composition",
+                    "subject": {
+                        "identifier": {
+                            "system": "https://fhir.nhs.uk/Id/nhs-number",
+                            "value": "nhs_number",
+                        }
+                    },
+                    "extension": [
+                        {
+                            "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                            "valueReference": {
+                                "reference": "unknown-resource",
+                            },
+                        }
+                    ],
+                },
+                "ServiceRequest resource not found with provided reference. "
+                "Provided reference: unknown-resource",
+                id="composition with based on extension referencing unknown resource",
+            ),
+            pytest.param(
+                lambda _: {
+                    "resourceType": "Composition",
+                    "subject": {
+                        "identifier": {
+                            "system": "https://fhir.nhs.uk/Id/nhs-number",
+                            "value": "nhs_number",
+                        }
+                    },
+                    "extension": [
+                        {
+                            "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                            "valueReference": {
+                                "reference": "practitionerrole",
+                            },
+                        }
+                    ],
+                },
+                "ServiceRequest resource not found with provided reference. "
+                "Provided reference: practitionerrole",
+                id="composition with based on extension referencing wrong resource",
+            ),
+            pytest.param(
+                lambda service_request_url: {
+                    "resourceType": "Composition",
+                    "subject": {
+                        "identifier": {
+                            "system": "https://fhir.nhs.uk/Id/nhs-number",
+                            "value": "nhs_number",
+                        }
+                    },
+                    "extension": [
+                        {
+                            "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                            "valueString": service_request_url,
+                        }
+                    ],
+                },
+                "Extension with url "
+                "http://hl7.eu/fhir/StructureDefinition"
+                "/composition-basedOn-order-or-requisition "
+                "is not expected type Reference",
+                id="composition with based on extension using wrong type",
+            ),
+            pytest.param(
+                lambda service_request_url: {
+                    "resourceType": "Composition",
+                    "subject": {
+                        "identifier": {
+                            "system": "https://fhir.nhs.uk/Id/nhs-number",
+                            "value": "nhs_number",
+                        }
+                    },
+                    "extension": [
+                        {
+                            "url": "wrong-url",
+                            "valueReference": {
+                                "reference": service_request_url,
+                            },
+                        }
+                    ],
+                },
+                "Composition does not define a valid basedOn-order-or-requisition "
+                "extension",
+                id="composition with based on extension using wrong url",
+            ),
+            pytest.param(
+                lambda _: {
+                    "resourceType": "Composition",
+                    "subject": {"identifier": {"value": "nhs_number"}},
+                },
+                "('entry', 3, 'resource', 'subject', 'identifier', 'system') "
+                "- Field required \n",
+                id="composition with subject but no system",
+            ),
+            pytest.param(
+                lambda _: {
+                    "resourceType": "Composition",
+                    "subject": {
+                        "identifier": {"system": "https://fhir.nhs.uk/Id/nhs-number"}
+                    },
+                },
+                "('entry', 3, 'resource', 'subject', 'identifier', 'value')"
+                " - Field required \n",
+                id="composition with subject but identifier has no value",
+            ),
+        ],
+    )
+    def test_invalid_composition_resource(
+        self,
+        composition_builder: Callable[[str], dict[str, Any]],
+        expected_diagnostic: str,
+        client: Client,
+    ) -> None:
+        bundle = {
+            "resourceType": "Bundle",
+            "type": "document",
+            "entry": [
+                {
+                    "fullUrl": "organization",
+                    "resource": {
+                        "resourceType": "Organization",
+                        "identifier": [
+                            {
+                                "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                                "value": "ods_code",
+                            }
+                        ],
+                    },
+                },
+                {
+                    "fullUrl": "practitionerrole",
+                    "resource": {
+                        "resourceType": "PractitionerRole",
+                        "organization": {"reference": "organization"},
+                    },
+                },
+                {
+                    "fullUrl": "servicerequest",
+                    "resource": {
+                        "resourceType": "ServiceRequest",
+                        "requester": {"reference": "practitionerrole"},
+                    },
+                },
+                {
+                    "fullUrl": "composition",
+                    "resource": composition_builder("servicerequest"),
+                },
+            ],
+        }
+
+        response = client.send(
+            data=json.dumps(bundle), request_method="POST", path="FHIR/R4/Bundle"
+        )
+        assert response.status_code == 400
+
+        response_data = response.json()
+        assert response_data == {
+            "resourceType": "OperationOutcome",
+            "issue": [
+                {
+                    "severity": "error",
+                    "code": "invalid",
+                    "diagnostics": expected_diagnostic,
+                }
+            ],
+        }
+
+    @pytest.mark.parametrize(
+        ("service_request", "expected_diagnostic"),
+        [
+            pytest.param(
+                {
+                    "resourceType": "ServiceRequest",
+                    # No requester field
+                },
+                "ServiceRequest does not define a valid requester",
+                id="ServiceRequest without requester field",
+            ),
+            pytest.param(
+                {
+                    "resourceType": "ServiceRequest",
+                    "requester": {"reference": "nonexistent-practitionerrole"},
+                },
+                "PractitionerRole resource not found with provided reference. "
+                "Provided reference: nonexistent-practitionerrole",
+                id="ServiceRequest requester does not reference a PractitionerRole "
+                "resource",
+            ),
+            pytest.param(
+                {
+                    "resourceType": "ServiceRequest",
+                    "requester": "invalid",
+                },
+                "('entry', 2, 'resource', 'requester') - Input should be a "
+                "dictionary or an instance of LiteralReference \n",
+                id="ServiceRequest requester field invalid type",
+            ),
+        ],
+    )
+    def test_invalid_service_request_resource(
+        self,
+        service_request: dict[str, Any],
+        expected_diagnostic: str,
+        client: Client,
+    ) -> None:
+        bundle = {
+            "resourceType": "Bundle",
+            "type": "document",
+            "entry": [
+                {
+                    "fullUrl": "organization",
+                    "resource": {
+                        "resourceType": "Organization",
+                        "identifier": [
+                            {
+                                "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                                "value": "ods_code",
+                            }
+                        ],
+                    },
+                },
+                {
+                    "fullUrl": "practitionerrole",
+                    "resource": {
+                        "resourceType": "PractitionerRole",
+                        "organization": {"reference": "organization"},
+                    },
+                },
+                {
+                    "fullUrl": "servicerequest",
+                    "resource": service_request,
+                },
+                {
+                    "fullUrl": "composition",
+                    "resource": {
+                        "resourceType": "Composition",
+                        "subject": {
+                            "identifier": {
+                                "system": "https://fhir.nhs.uk/Id/nhs-number",
+                                "value": "nhs_number",
+                            }
+                        },
+                        "extension": [
+                            {
+                                "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                                "valueReference": {
+                                    "reference": "servicerequest",
+                                },
+                            }
+                        ],
+                    },
+                },
+            ],
+        }
+
+        response = client.send(
+            data=json.dumps(bundle), request_method="POST", path="FHIR/R4/Bundle"
+        )
+        assert response.status_code == 400
+
+        response_data = response.json()
+        assert response_data == {
+            "resourceType": "OperationOutcome",
+            "issue": [
+                {
+                    "severity": "error",
+                    "code": "invalid",
+                    "diagnostics": expected_diagnostic,
+                }
+            ],
+        }
+
+    @pytest.mark.parametrize(
+        ("practitioner_role", "expected_diagnostic"),
+        [
+            pytest.param(
+                {
+                    "resourceType": "PractitionerRole",
+                    # No organization field
+                },
+                "PractitionerRole (practitionerrole) does not define a valid "
+                "Organization reference",
+                id="PractitionerRole without organization field",
+            ),
+            pytest.param(
+                {
+                    "resourceType": "PractitionerRole",
+                    "organization": {"reference": "nonexistent-organization"},
+                },
+                "Organization resource not found with provided reference. "
+                "Provided reference: nonexistent-organization",
+                id="PractitionerRole organization does not reference an "
+                "Organization resource",
+            ),
+            pytest.param(
+                {
+                    "resourceType": "PractitionerRole",
+                    "organization": "invalid",
+                },
+                "('entry', 1, 'resource', 'organization') - Input should be a "
+                "dictionary or an instance of LiteralReference \n",
+                id="PractitionerRole organization field is invalid",
+            ),
+        ],
+    )
+    def test_invalid_practitioner_role_resource(
+        self,
+        practitioner_role: dict[str, Any],
+        expected_diagnostic: str,
+        client: Client,
+    ) -> None:
+        bundle = {
+            "resourceType": "Bundle",
+            "type": "document",
+            "entry": [
+                {
+                    "fullUrl": "organization",
+                    "resource": {
+                        "resourceType": "Organization",
+                        "identifier": [
+                            {
+                                "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                                "value": "ods_code",
+                            }
+                        ],
+                    },
+                },
+                {
+                    "fullUrl": "practitionerrole",
+                    "resource": practitioner_role,
+                },
+                {
+                    "fullUrl": "servicerequest",
+                    "resource": {
+                        "resourceType": "ServiceRequest",
+                        "requester": {"reference": "practitionerrole"},
+                    },
+                },
+                {
+                    "fullUrl": "composition",
+                    "resource": {
+                        "resourceType": "Composition",
+                        "subject": {
+                            "identifier": {
+                                "system": "https://fhir.nhs.uk/Id/nhs-number",
+                                "value": "nhs_number",
+                            }
+                        },
+                        "extension": [
+                            {
+                                "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                                "valueReference": {
+                                    "reference": "servicerequest",
+                                },
+                            }
+                        ],
+                    },
+                },
+            ],
+        }
+
+        response = client.send(
+            data=json.dumps(bundle), request_method="POST", path="FHIR/R4/Bundle"
+        )
+        assert response.status_code == 400
+
+        response_data = response.json()
+        assert response_data == {
+            "resourceType": "OperationOutcome",
+            "issue": [
+                {
+                    "severity": "error",
+                    "code": "invalid",
+                    "diagnostics": expected_diagnostic,
+                }
+            ],
+        }
+
+    @pytest.mark.parametrize(
+        ("organization", "expected_diagnostic"),
+        [
+            pytest.param(
+                {
+                    "resourceType": "Organization",
+                    # No identifier field
+                },
+                "Organisation (organization) does not define a valid subject "
+                "identifier",
+                id="organization with no identifier",
+            ),
+            pytest.param(
+                {
+                    "resourceType": "Organization",
+                    "identifier": [
+                        {
+                            "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                            "value": "ods_code_1",
+                        },
+                        {
+                            "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                            "value": "ods_code_2",
+                        },
+                    ],
+                },
+                "Organization (organization) defines multiple identifier values. "
+                "Identifier values: ['ods_code_1', 'ods_code_2']",
+                id="organization with multiple identifiers",
+            ),
+            pytest.param(
+                {
+                    "resourceType": "Organization",
+                    "identifier": [
+                        {
+                            "system": "https://example.com/unknown-system",
+                            "value": "some_value",
+                        }
+                    ],
+                },
+                "Organization (organization) does not define a supported identifier. "
+                "Supported system 'https://fhir.nhs.uk/Id/ods-organization-code'",
+                id="organization with unknown identifier system",
+            ),
+        ],
+    )
+    def test_invalid_organization_resource(
+        self, organization: dict[str, Any], expected_diagnostic: str, client: Client
+    ) -> None:
+        bundle = {
+            "resourceType": "Bundle",
+            "type": "document",
+            "entry": [
+                {
+                    "fullUrl": "organization",
+                    "resource": organization,
+                },
+                {
+                    "fullUrl": "practitionerrole",
+                    "resource": {
+                        "resourceType": "PractitionerRole",
+                        "organization": {"reference": "organization"},
+                    },
+                },
+                {
+                    "fullUrl": "servicerequest",
+                    "resource": {
+                        "resourceType": "ServiceRequest",
+                        "requester": {"reference": "practitionerrole"},
+                    },
+                },
+                {
+                    "fullUrl": "composition",
+                    "resource": {
+                        "resourceType": "Composition",
+                        "subject": {
+                            "identifier": {
+                                "system": "https://fhir.nhs.uk/Id/nhs-number",
+                                "value": "nhs_number",
+                            }
+                        },
+                        "extension": [
+                            {
+                                "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                                "valueReference": {
+                                    "reference": "servicerequest",
+                                },
+                            }
+                        ],
+                    },
+                },
+            ],
+        }
+
+        response = client.send(
+            data=json.dumps(bundle), request_method="POST", path="FHIR/R4/Bundle"
         )
         assert response.status_code == 400
 
@@ -265,6 +895,8 @@ class TestStatusEndpoint:
         assert response.status_code == 200
         assert response.headers["Content-Type"] == "application/json"
 
+        print("Received /_status response:", response.json())
+
         parsed = StatusResponse.model_validate(response.json())
 
         assert parsed.status == "pass"
@@ -273,6 +905,10 @@ class TestStatusEndpoint:
 
 class StatusLinks(BaseModel):
     self: HttpUrl
+
+
+class HealthCheckOutcome(BaseModel):
+    status: Literal["pass", "fail"]
 
 
 class HealthCheck(BaseModel):

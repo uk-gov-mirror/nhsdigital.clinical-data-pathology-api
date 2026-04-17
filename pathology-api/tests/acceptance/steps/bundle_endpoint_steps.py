@@ -1,12 +1,18 @@
 """Step definitions for pathology API bundle endpoint feature."""
 
+from collections.abc import Callable
+
 import requests
-from pathology_api.fhir.r4.elements import LogicalReference, PatientIdentifier
-from pathology_api.fhir.r4.resources import Bundle, BundleType, Composition
+from pathology_api.fhir.r4.resources import (
+    Bundle,
+    BundleType,
+)
 from pytest_bdd import given, parsers, then, when
 
 from tests.acceptance.conftest import ResponseContext
 from tests.conftest import Client
+
+BUNDLE_ENDPOINT = "FHIR/R4/Bundle"
 
 
 @given("the API is running")
@@ -23,30 +29,26 @@ def step_api_is_running(client: Client) -> None:
 
 
 @when("I send a valid Bundle to the Pathology API")
-def step_send_valid_bundle(client: Client, response_context: ResponseContext) -> None:
+def step_send_valid_bundle(
+    client: Client,
+    response_context: ResponseContext,
+    build_valid_test_result: Callable[[str, str], Bundle],
+) -> None:
     """
     Send a valid Bundle to the API.
 
     Args:
         client: Test client
         response_context: Context to store the response
+        build_valid_test_result: Function to build a valid test result
     """
+
     response_context.response = client.send(
-        path="FHIR/R4/Bundle",
+        path=BUNDLE_ENDPOINT,
         request_method="POST",
-        data=Bundle.create(
-            type="document",
-            entry=[
-                Bundle.Entry(
-                    fullUrl="composition",
-                    resource=Composition.create(
-                        subject=LogicalReference(
-                            PatientIdentifier.from_nhs_number("nhs_number")
-                        )
-                    ),
-                )
-            ],
-        ).model_dump_json(by_alias=True, exclude_none=True),
+        data=build_valid_test_result("nhs_number_1", "ods_code").model_dump_json(
+            by_alias=True, exclude_none=True
+        ),
     )
 
 
@@ -64,7 +66,7 @@ def step_send_invalid_bundle(client: Client, response_context: ResponseContext) 
     )
 
     response_context.response = client.send(
-        path="FHIR/R4/Bundle", request_method="POST", data=bundle
+        path=BUNDLE_ENDPOINT, request_method="POST", data=bundle
     )
 
 
@@ -78,7 +80,7 @@ def step_send_bundle_without_composition(
     )
 
     response_context.response = client.send(
-        path="FHIR/R4/Bundle",
+        path=BUNDLE_ENDPOINT,
         request_method="POST",
         data=bundle.model_dump_json(by_alias=True, exclude_none=True),
     )
@@ -96,7 +98,7 @@ def step_send_bundle_wrong_type(
     )
 
     response_context.response = client.send(
-        path="FHIR/R4/Bundle",
+        path=BUNDLE_ENDPOINT,
         request_method="POST",
         data=bundle.model_dump_json(by_alias=True, exclude_none=True),
     )
@@ -111,7 +113,7 @@ def step_check_status_code(
     """Verify the response status code matches expected value.
 
     Args:
-        context: Behave context containing the response
+        response_context: Context containing the response
         expected_status: Expected HTTP status code
     """
     response = _validate_response_set(response_context)
@@ -129,7 +131,7 @@ def step_check_response_contains(
     """Verify the response contains the expected text.
 
     Args:
-        context: Behave context containing the response
+        response_context: Context containing the response
         expected_text: Text that should be in the response
     """
     response = _validate_response_set(response_context)
@@ -146,7 +148,8 @@ def step_check_response_contains_valid_bundle(
     """Verify the response contains a valid FHIR Bundle.
 
     Args:
-        context: Behave context containing the response
+        response_context: Context containing the response
+        expected_type: Expected Bundle type
     """
     response = _validate_response_set(response_context)
 

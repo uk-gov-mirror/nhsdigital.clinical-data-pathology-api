@@ -34,8 +34,42 @@ class TestConsumerContract:
                                 "value": "nhs_number",
                             },
                         },
+                        "extension": [
+                            {
+                                "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                                "valueReference": {
+                                    "reference": "servicerequest",
+                                },
+                            }
+                        ],
                     },
-                }
+                },
+                {
+                    "fullUrl": "servicerequest",
+                    "resource": {
+                        "resourceType": "ServiceRequest",
+                        "requester": {"reference": "practitionerrole"},
+                    },
+                },
+                {
+                    "fullUrl": "practitionerrole",
+                    "resource": {
+                        "resourceType": "PractitionerRole",
+                        "organization": {"reference": "organization"},
+                    },
+                },
+                {
+                    "fullUrl": "organization",
+                    "resource": {
+                        "resourceType": "Organization",
+                        "identifier": [
+                            {
+                                "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                                "value": "ods_code",
+                            }
+                        ],
+                    },
+                },
             ],
         }
 
@@ -53,8 +87,42 @@ class TestConsumerContract:
                                 "value": "nhs_number",
                             },
                         },
+                        "extension": [
+                            {
+                                "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+                                "valueReference": {
+                                    "reference": "servicerequest",
+                                },
+                            }
+                        ],
                     },
-                }
+                },
+                {
+                    "fullUrl": "servicerequest",
+                    "resource": {
+                        "resourceType": "ServiceRequest",
+                        "requester": {"reference": "practitionerrole"},
+                    },
+                },
+                {
+                    "fullUrl": "practitionerrole",
+                    "resource": {
+                        "resourceType": "PractitionerRole",
+                        "organization": {"reference": "organization"},
+                    },
+                },
+                {
+                    "fullUrl": "organization",
+                    "resource": {
+                        "resourceType": "Organization",
+                        "identifier": [
+                            {
+                                "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+                                "value": "ods_code",
+                            }
+                        ],
+                    },
+                },
             ],
             "id": match.uuid(),
             "meta": {
