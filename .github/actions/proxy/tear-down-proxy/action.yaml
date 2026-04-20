@@ -17,6 +17,9 @@ inputs:
   proxygen-api-name:
     description: 'Proxygen API name'
     required: true
+  proxygen-environment:
+    description: 'Proxygen environment'
+    required: true
 
 runs:
   using: composite
@@ -30,6 +33,9 @@ runs:
         proxygen-api-name: ${{ inputs.proxygen-api-name }}
 
     - name: Tear down preview API proxy
+      env:
+        ENVIRONMENT: "${{ inputs.proxygen-environment }}"
+        BASE_PATH: "${{ inputs.proxy-base-path }}"
       shell: bash
       run: |
-        proxygen instance delete internal-dev ${{ inputs.proxy-base-path }} --no-confirm
+        proxygen instance delete "$ENVIRONMENT" "$BASE_PATH" --no-confirm
