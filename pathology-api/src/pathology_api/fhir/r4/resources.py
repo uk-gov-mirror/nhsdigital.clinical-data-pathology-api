@@ -20,7 +20,6 @@ from .elements import (
     LogicalReference,
     Meta,
     PatientIdentifier,
-    UUIDIdentifier,
 )
 
 
@@ -128,7 +127,6 @@ class Bundle(Resource, resource_type="Bundle"):
     """A FHIR R4 Bundle resource."""
 
     bundle_type: BundleType = Field(alias="type", frozen=True)
-    identifier: Annotated[UUIDIdentifier | None, Field(frozen=True)] = None
     entries: list["Bundle.Entry"] | None = Field(None, frozen=True, alias="entry")
 
     class Entry(BaseModel):

@@ -81,9 +81,7 @@ def _invalid_composition_scenarios() -> list[Any]:
         ),
         pytest.param(
             lambda _: Composition.create(
-                subject=LogicalReference(
-                    PatientIdentifier.from_nhs_number("nhs_number")
-                ),
+                subject=LogicalReference(PatientIdentifier.create_with("nhs_number")),
                 extension=None,
             ),
             "Composition does not define a valid basedOn-order-or-requisition "
@@ -92,9 +90,7 @@ def _invalid_composition_scenarios() -> list[Any]:
         ),
         pytest.param(
             lambda service_request_url: Composition.create(
-                subject=LogicalReference(
-                    PatientIdentifier.from_nhs_number("nhs_number")
-                ),
+                subject=LogicalReference(PatientIdentifier.create_with("nhs_number")),
                 extension=[
                     _InvalidExtension(
                         url="http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
@@ -109,9 +105,7 @@ def _invalid_composition_scenarios() -> list[Any]:
         ),
         pytest.param(
             lambda service_request_url: Composition.create(
-                subject=LogicalReference(
-                    PatientIdentifier.from_nhs_number("nhs_number")
-                ),
+                subject=LogicalReference(PatientIdentifier.create_with("nhs_number")),
                 extension=[
                     ReferenceExtension(
                         url="invalid",
@@ -125,9 +119,7 @@ def _invalid_composition_scenarios() -> list[Any]:
         ),
         pytest.param(
             lambda _: Composition.create(
-                subject=LogicalReference(
-                    PatientIdentifier.from_nhs_number("nhs_number")
-                ),
+                subject=LogicalReference(PatientIdentifier.create_with("nhs_number")),
                 extension=[
                     ReferenceExtension(
                         url="http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
@@ -195,7 +187,7 @@ def _invalid_organization_scenarios() -> list[Any]:
         ),
         pytest.param(
             Organization.create(
-                identifier=[PatientIdentifier.from_nhs_number("nhs_number")]
+                identifier=[PatientIdentifier.create_with("nhs_number")]
             ),
             r"Organization \(organisation\) does not define a supported identifier\. "
             r"Supported system 'https://fhir\.nhs\.uk/Id/ods-organization-code'",
@@ -224,51 +216,6 @@ class TestHandleRequest:
         )
         yield
         reset_correlation_id()
-
-    def _build_valid_test_result(self) -> Bundle:
-        organisation_entry = Bundle.Entry(
-            fullUrl="organisation",
-            resource=Organization.create(
-                identifier=[OrganizationIdentifier.from_ods_code("ods_code")]
-            ),
-        )
-
-        practitioner_role_entry = Bundle.Entry(
-            fullUrl="practitioner_role",
-            resource=PractitionerRole.create(
-                organization=LiteralReference(reference=organisation_entry.full_url)
-            ),
-        )
-
-        service_request_entry = Bundle.Entry(
-            fullUrl="service_request",
-            resource=ServiceRequest.create(
-                requester=LiteralReference(reference=practitioner_role_entry.full_url)
-            ),
-        )
-
-        composition = Composition.create(
-            subject=LogicalReference(PatientIdentifier.from_nhs_number("nhs_number_1")),
-            extension=[
-                ReferenceExtension(
-                    url="http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
-                    valueReference=LiteralReference(service_request_entry.full_url),
-                )
-            ],
-        )
-
-        return Bundle.create(
-            type="document",
-            entry=[
-                organisation_entry,
-                practitioner_role_entry,
-                service_request_entry,
-                Bundle.Entry(
-                    fullUrl="composition",
-                    resource=composition,
-                ),
-            ],
-        )
 
     def test_handle_request(
         self,
@@ -357,7 +304,7 @@ class TestHandleRequest:
         self,
     ) -> None:
         composition = Composition.create(
-            subject=LogicalReference(PatientIdentifier.from_nhs_number("nhs_number_1"))
+            subject=LogicalReference(PatientIdentifier.create_with("nhs_number_1"))
         )
 
         bundle = (
@@ -451,7 +398,7 @@ class TestHandleRequest:
         self,
     ) -> None:
         composition = Composition.create(
-            subject=LogicalReference(PatientIdentifier.from_nhs_number("nhs_number_1"))
+            subject=LogicalReference(PatientIdentifier.create_with("nhs_number_1"))
         )
 
         bundle = Bundle.create(

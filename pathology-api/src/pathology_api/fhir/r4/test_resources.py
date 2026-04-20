@@ -1,4 +1,6 @@
 import json
+import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 import pydantic
@@ -208,9 +210,7 @@ class TestBundle:
         expected_entry = Bundle.Entry(
             fullUrl="full",
             resource=Composition.create(
-                subject=LogicalReference(
-                    PatientIdentifier.from_nhs_number("nhs_number")
-                )
+                subject=LogicalReference(PatientIdentifier.create_with("nhs_number"))
             ),
         )
 
@@ -220,20 +220,16 @@ class TestBundle:
         )
 
         assert bundle.bundle_type == "document"
-        assert bundle.identifier is None
         assert bundle.entries == [expected_entry]
 
     def test_create_without_entries(self) -> None:
         bundle = Bundle.empty("document")
 
         assert bundle.bundle_type == "document"
-        assert bundle.identifier is None
         assert bundle.entries is None
 
     expected_composition = Composition.create(
-        subject=LogicalReference(
-            identifier=PatientIdentifier.from_nhs_number("nhs_number")
-        )
+        subject=LogicalReference(identifier=PatientIdentifier.create_with("nhs_number"))
     )
 
     @pytest.mark.parametrize(
@@ -309,7 +305,7 @@ class TestBundle:
 
     def test_has_resource(self) -> None:
         expected_resource = Patient.create(
-            identifier=PatientIdentifier.from_nhs_number("nhs_number")
+            identifier=PatientIdentifier.create_with("nhs_number")
         )
 
         bundle = Bundle.create(
@@ -327,7 +323,7 @@ class TestBundle:
         assert bundle.has_resource(Resource) is False
 
     expected_patient = Patient.create(
-        identifier=PatientIdentifier.from_nhs_number("nhs_number")
+        identifier=PatientIdentifier.create_with("nhs_number")
     )
 
     @pytest.mark.parametrize(
@@ -357,7 +353,7 @@ class TestBundle:
                         Bundle.Entry(
                             fullUrl="secondUrl",
                             resource=Patient.create(
-                                identifier=PatientIdentifier.from_nhs_number(
+                                identifier=PatientIdentifier.create_with(
                                     "second_nhs_number"
                                 )
                             ),
@@ -380,7 +376,7 @@ class TestBundle:
 
     def test_get_resource_wrong_type(self) -> None:
         expected_resource = Patient.create(
-            identifier=PatientIdentifier.from_nhs_number("nhs_number")
+            identifier=PatientIdentifier.create_with("nhs_number")
         )
 
         bundle = Bundle.create(
@@ -392,7 +388,7 @@ class TestBundle:
 
     def test_get_resource_wrong_url(self) -> None:
         expected_resource = Patient.create(
-            identifier=PatientIdentifier.from_nhs_number("nhs_number")
+            identifier=PatientIdentifier.create_with("nhs_number")
         )
 
         bundle = Bundle.create(
@@ -404,7 +400,7 @@ class TestBundle:
 
     def test_get_resource_multiple_resources_same_url(self) -> None:
         expected_resource = Patient.create(
-            identifier=PatientIdentifier.from_nhs_number("nhs_number")
+            identifier=PatientIdentifier.create_with("nhs_number")
         )
 
         bundle = Bundle.create(
@@ -420,6 +416,37 @@ class TestBundle:
             match="Multiple resources provided with same fullUrl: fullUrl",
         ):
             bundle.get_resource(url="fullUrl", t=Patient)
+
+    def test_create_with_identifier(self) -> None:
+        data: dict[str, Any] = {
+            "resourceType": "Bundle",
+            "type": "document",
+            "identifier": {"system": "urn:ietf:rfc:3986", "value": str(uuid.uuid4())},
+        }
+
+        bundle = Bundle.model_validate(data)
+        assert bundle.resource_type == "Bundle"
+        assert bundle.bundle_type == "document"
+
+        serialised = bundle.model_dump(by_alias=True)
+        assert serialised["identifier"] == {
+            "system": "urn:ietf:rfc:3986",
+            "value": data["identifier"]["value"],
+        }
+
+    def test_create_with_unexpected_field(self) -> None:
+        data: dict[str, Any] = {
+            "resourceType": "Bundle",
+            "type": "document",
+            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        }
+
+        bundle = Bundle.model_validate(data)
+        assert bundle.resource_type == "Bundle"
+        assert bundle.bundle_type == "document"
+
+        serialised = bundle.model_dump(by_alias=True)
+        assert serialised["timestamp"] == data["timestamp"]
 
 
 class TestOperationOutcome:

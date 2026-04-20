@@ -20,7 +20,7 @@ from pathology_api.fhir.r4.resources import (
 
 def _build_composition(service_request_url: str) -> Composition:
     return Composition.create(
-        subject=LogicalReference(PatientIdentifier.from_nhs_number("nhs_number")),
+        subject=LogicalReference(PatientIdentifier.create_with("nhs_number")),
         extension=[
             # Using HTTP to match profile required by implementation guide.
             ReferenceExtension(

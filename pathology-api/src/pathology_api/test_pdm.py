@@ -94,7 +94,7 @@ class TestPDMClient:
                     fullUrl="patient",
                     resource=Composition.create(
                         subject=LogicalReference(
-                            PatientIdentifier.from_nhs_number("nhs_number")
+                            PatientIdentifier.create_with("nhs_number")
                         )
                     ),
                 )
@@ -140,7 +140,7 @@ class TestPDMClient:
                     fullUrl="patient",
                     resource=Composition.create(
                         subject=LogicalReference(
-                            PatientIdentifier.from_nhs_number("nhs_number")
+                            PatientIdentifier.create_with("nhs_number")
                         )
                     ),
                 )
@@ -164,7 +164,7 @@ class TestPDMClient:
                     fullUrl="patient",
                     resource=Composition.create(
                         subject=LogicalReference(
-                            PatientIdentifier.from_nhs_number("nhs_number")
+                            PatientIdentifier.create_with("nhs_number")
                         )
                     ),
                 )
@@ -187,7 +187,7 @@ class TestPDMClient:
                     fullUrl="patient",
                     resource=Composition.create(
                         subject=LogicalReference(
-                            PatientIdentifier.from_nhs_number("nhs_number")
+                            PatientIdentifier.create_with("nhs_number")
                         )
                     ),
                 )

@@ -11,16 +11,16 @@ from aws_lambda_powertools.event_handler import (
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
-with patch("boto3.resource"):
-    from apim_mock.auth_check import AuthenticationError
-    from common.storage_helper import ItemNotFoundException
-
 os.environ["PDM_TABLE_NAME"] = "test_table"
 os.environ["DDB_INDEX_TAG"] = "test_branch"
 os.environ["AUTH_URL"] = "auth_url"
 os.environ["PUBLIC_KEY_URL"] = "public_key_url"
 os.environ["API_KEY"] = "api_key"
 os.environ["TOKEN_TABLE_NAME"] = "token_table"  # noqa: S105 - Dummy value
+
+with patch("boto3.resource"):
+    from apim_mock.auth_check import AuthenticationError
+    from common.storage_helper import ItemNotFoundException
 
 
 @pytest.fixture
@@ -38,13 +38,13 @@ def multiple_patient_document_payload(
             {
                 "resource": {
                     "resourceType": "Patient",
-                    "identifier": {"value": "patient1"},
+                    "identifier": [{"value": "patient1"}],
                 }
             },
             {
                 "resource": {
                     "resourceType": "Patient",
-                    "identifier": {"value": "patient2"},
+                    "identifier": [{"value": "patient2"}],
                 }
             },
         ],
@@ -61,7 +61,7 @@ def validation_error_patient_payload(
             {
                 "resource": {
                     "resourceType": "Patient",
-                    "identifier": {"value": "PDM_VALIDATION_ERROR"},
+                    "identifier": [{"value": "PDM_VALIDATION_ERROR"}],
                 }
             },
         ],
@@ -78,7 +78,7 @@ def server_error_patient_payload(
             {
                 "resource": {
                     "resourceType": "Patient",
-                    "identifier": {"value": "PDM_SERVER_ERROR"},
+                    "identifier": [{"value": "PDM_SERVER_ERROR"}],
                 }
             },
         ],
@@ -271,7 +271,7 @@ class TestPDMMockHandler:
         mock_dynamodb_client.Table.return_value.get_item.return_value = {
             "Item": {
                 "sessionId": "document_id",
-                "document": basic_saved_document,
+                "document": json.dumps(basic_saved_document),
                 "type": "document",
                 "expiresAt": 1,
                 "ddb_index": "test_branch",
@@ -481,7 +481,7 @@ class TestPDMMockHandler:
         check_authenticated_mock.return_value = None
         mock_storage_helper.return_value = {
             "sessionId": "document_id",
-            "document": {"test_key": "test_data"},
+            "document": json.dumps({"test_key": "test_data"}),
         }
 
         event = self._create_test_event(
