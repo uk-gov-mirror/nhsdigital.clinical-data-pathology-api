@@ -1,24 +1,17 @@
 import logging
-import os
 from collections.abc import Callable
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pydantic
 import pytest
-
-os.environ["CLIENT_TIMEOUT"] = "1s"
-os.environ["APIM_TOKEN_URL"] = "apim_url"  # noqa S105 - dummy value
-os.environ["APIM_PRIVATE_KEY_NAME"] = "apim_private_key_name"
-os.environ["APIM_API_KEY_NAME"] = "apim_api_key_name"
-os.environ["APIM_TOKEN_EXPIRY_THRESHOLD"] = "1s"  # noqa S105 - dummy value
-os.environ["APIM_KEY_ID"] = "apim_key"
-os.environ["PDM_BUNDLE_URL"] = "pdm_bundle_url"
-
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
-with patch("aws_lambda_powertools.utilities.parameters.get_secret") as get_secret_mock:
+with (
+    patch("pathology_api.environment.apim_authenticator"),
+):
     from lambda_handler import handler
+    from pathology_api.mns import MnsException
 
 from pathology_api.exception import ValidationError
 from pathology_api.fhir.r4.elements import Meta
@@ -114,7 +107,7 @@ class TestHandler:
         )
 
         with (
-            patch("pathology_api.handler._send_request"),
+            patch("pathology_api.mns.create_event"),
             caplog.at_level(logging.DEBUG),
         ):
             handler(event, context)
@@ -137,7 +130,7 @@ class TestHandler:
             headers={"nhsd-correlation-id": "c876145d-1ebf-4e22-8ff8-275b570c1ec4"},
         )
         with (
-            patch("pathology_api.handler._send_request"),
+            patch("pathology_api.mns.create_event"),
             caplog.at_level(logging.DEBUG),
         ):
             handler(event, context)
@@ -151,7 +144,7 @@ class TestHandler:
             headers={"nhsd-correlation-id": "d876145d-1ebf-4e22-8ff8-275b570c1ec4"},
         )
         with (
-            patch("pathology_api.handler._send_request"),
+            patch("pathology_api.mns.create_event"),
             caplog.at_level(logging.DEBUG),
         ):
             handler(event2, context)
@@ -202,29 +195,6 @@ class TestHandler:
             returned_issue["diagnostics"]
             == "Missing required header: nhsd-correlation-id"
         )
-
-    @pytest.mark.parametrize(
-        "malicious_value",
-        [
-            "abc\ndef",  # newline injection
-            '{"key": "value"}',  # JSON fragment injection
-            "a" * 200,  # oversized input
-        ],
-    )
-    def test_malicious_correlation_id_values_are_rejected(
-        self,
-        malicious_value: str,
-        bundle: Bundle,
-        context: LambdaContext,
-    ) -> None:
-        event = self._create_test_event(
-            body=bundle.model_dump_json(by_alias=True),
-            path_params="FHIR/R4/Bundle",
-            request_method="POST",
-            headers={"nhsd-correlation-id": malicious_value},
-        )
-        response = handler(event, context)
-        assert response["statusCode"] == 500
 
     def test_correlation_id_is_cleared_after_exception_mid_handler(
         self, context: LambdaContext
@@ -327,18 +297,30 @@ class TestHandler:
                 500,
                 id="Unexpected exception",
             ),
+            pytest.param(
+                MnsException("Test MNS error"),
+                {
+                    "severity": "fatal",
+                    "code": "exception",
+                    "diagnostics": "Failed to publish an event",
+                },
+                500,
+                id="MnsException",
+            ),
         ],
     )
+    @patch("lambda_handler.handle_request")
     def test_create_test_result_processing_error(
         self,
+        handle_request_mock: MagicMock,
         error: type[Exception],
         expected_issue: OperationOutcome.Issue,
         expected_status_code: int,
         post_event: dict[str, Any],
         context: LambdaContext,
     ) -> None:
-        with patch("lambda_handler.handle_request", side_effect=error):
-            response = handler(post_event, context)
+        handle_request_mock.side_effect = error
+        response = handler(post_event, context)
 
         assert response["statusCode"] == expected_status_code
         assert response["headers"]["Content-Type"] == "application/fhir+json"

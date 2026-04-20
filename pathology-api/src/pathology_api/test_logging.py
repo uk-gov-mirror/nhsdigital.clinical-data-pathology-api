@@ -21,6 +21,10 @@ def _make_log_record() -> logging.LogRecord:
 
 
 class TestCorrelationIdFilter:
+    def setup_method(self) -> None:
+        # Ensure correlation ID is reset before each test
+        reset_correlation_id()
+
     def test_filter_is_a_logging_filter_subclass(self) -> None:
         assert issubclass(_CorrelationIdFilter, logging.Filter)
 
@@ -40,7 +44,6 @@ class TestCorrelationIdFilter:
         record = _make_log_record()
         set_correlation_id("abc-123")
         f.filter(record)
-        reset_correlation_id()
         assert record.correlation_id == "abc-123"  # type: ignore[attr-defined]
 
     def test_filter_injects_empty_string_after_correlation_id_reset(

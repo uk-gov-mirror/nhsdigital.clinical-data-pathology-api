@@ -9,6 +9,7 @@ import requests
 from requests.adapters import HTTPAdapter
 
 from pathology_api.logging import get_logger
+from pathology_api.request_context import get_correlation_id
 
 _logger = get_logger(__name__)
 
@@ -40,11 +41,29 @@ class SessionManager:
             *args: Any,
             **kwargs: Any,
         ) -> requests.Response:
-            _logger.debug(
-                "Applying default timeout of %s seconds to request", self._timeout
-            )
             kwargs["timeout"] = self._timeout
-            return super().send(request, *args, **kwargs)
+            if "X-Correlation-ID" not in request.headers:
+                request.headers["X-Correlation-ID"] = get_correlation_id()
+
+            _logger.info(
+                "Sending HTTP request. method=%s url=%s headers=%s",
+                request.method,
+                request.url,
+                # Omit Authorization header from logging
+                {
+                    k: v
+                    for k, v in request.headers.items()
+                    if k.lower() != "authorization"
+                },
+            )
+            response = super().send(request, *args, **kwargs)
+            _logger.info(
+                "Received HTTP response. status_code=%s response_headers=%s",
+                response.status_code,
+                response.headers,
+            )
+
+            return response
 
     def __init__(
         self,
@@ -58,16 +77,12 @@ class SessionManager:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             with ExitStack() as stack:
-                _logger.debug("Creating new session for request")
                 session = requests.Session()
                 stack.enter_context(session)
 
-                _logger.debug("Mounted default settings to session")
                 session.mount("https://", self._client_adapter)
 
                 if self._client_certificate is not None:
-                    _logger.debug("Configuring session with client certificate...")
-
                     # File added to Exit stack and will be automatically cleaned up with
                     # the stack.
                     cert_file = tempfile.NamedTemporaryFile(  # noqa: SIM115
@@ -88,7 +103,6 @@ class SessionManager:
                     key_file.flush()
 
                     session.cert = (cert_file.name, key_file.name)
-                    _logger.debug("Client certificate added.")
 
                 return func(session, *args, **kwargs)
 

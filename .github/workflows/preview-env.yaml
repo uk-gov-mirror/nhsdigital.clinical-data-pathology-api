@@ -183,7 +183,7 @@ jobs:
                                         APIM_KEY_ID=$KEY_ID, \
                                         APIM_TOKEN_URL=$MOCK_URL/apim/oauth2/token, \
                                         PDM_BUNDLE_URL=$MOCK_URL/apim/check_auth, \
-                                        MNS_EVENT_URL=$MOCK_URL/mns, \
+                                        MNS_EVENT_URL=$MOCK_URL/mns/events, \
                                         CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
                                         JWKS_SECRET_NAME=$JWKS_SECRET}" || true
             wait_for_lambda_ready
@@ -206,7 +206,7 @@ jobs:
                                         APIM_MTLS_KEY_NAME=$MTLS_KEY, \
                                         APIM_TOKEN_URL=$MOCK_URL/apim/oauth2/token, \
                                         PDM_BUNDLE_URL=$MOCK_URL/apim/check_auth, \
-                                        MNS_EVENT_URL=$MOCK_URL/mns, \
+                                        MNS_EVENT_URL=$MOCK_URL/mns/events, \
                                         CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
                                         JWKS_SECRET_NAME=$JWKS_SECRET}" \
               --publish
@@ -229,13 +229,15 @@ jobs:
       - name: Create or update preview Lambda with integration (on open/sync/reopen)
         if: github.event.action != 'closed' && github.event.pull_request.user.login != 'dependabot[bot]'
         env:
-          MOCK_URL: ${{ steps.names.outputs.mock_preview_url }}
+          APIM_INT_URL: ${{ vars.APIM_INT_URL }}
           TOKEN_EXPIRY_THRESHOLD: ${{ secrets.APIM_TOKEN_EXPIRY_THRESHOLD }}
           JWKS_SECRET_NAME: ${{ secrets.JWKS_SECRET }}
           APIM_PRIVATE_KEY: ${{ secrets.APIM_PRIVATE_KEY }}
           APIM_APIKEY: ${{ secrets.APIM_APIKEY }}
           API_MTLS_CERT: ${{ secrets.API_MTLS_CERT }}
           API_MTLS_KEY: ${{ secrets.API_MTLS_KEY }}
+          APIM_KEY_ID: ${{ secrets.APIM_KEY_ID }}
+          CLIENT_REQUEST_TIMEOUT: ${{ secrets.CLIENT_REQUEST_TIMEOUT }}
         run: |
           cd pathology-api/target/
           FN="${{ steps.names.outputs.int_function_name }}"
@@ -245,6 +247,8 @@ jobs:
           API_KEY="${APIM_APIKEY:-/cds/pathology/dev/apim/api-key}"
           MTLS_CERT="${API_MTLS_CERT:-/cds/pathology/dev/mtls/client1-key-public}"
           MTLS_KEY="${API_MTLS_KEY:-/cds/pathology/dev/mtls/client1-key-secret}"
+          KEY_ID="${APIM_KEY_ID:-DEV-1}"
+          CLIENT_TIMEOUT="${CLIENT_REQUEST_TIMEOUT:-10s}"
           echo "Deploying preview function: $FN"
           wait_for_lambda_ready() {
             while true; do
@@ -266,14 +270,18 @@ jobs:
             wait_for_lambda_ready
             aws lambda update-function-configuration --function-name "$FN" \
               --handler "${{ env.LAMBDA_HANDLER }}" \
+              --memory-size 512 \
+              --timeout 30 \
               --environment "Variables={APIM_TOKEN_EXPIRY_THRESHOLD=$EXPIRY_THRESHOLD, \
                                         APIM_PRIVATE_KEY_NAME=$PRIVATE_KEY, \
                                         APIM_API_KEY_NAME=$API_KEY, \
                                         APIM_MTLS_CERT_NAME=$MTLS_CERT, \
                                         APIM_MTLS_KEY_NAME=$MTLS_KEY, \
-                                        APIM_TOKEN_URL=$MOCK_URL/apim, \
-                                        PDM_BUNDLE_URL=$MOCK_URL/pdm, \
-                                        MNS_EVENT_URL=$MOCK_URL/mns, \
+                                        APIM_KEY_ID=$KEY_ID, \
+                                        APIM_TOKEN_URL=$APIM_INT_URL/oauth2/token, \
+                                        PDM_BUNDLE_URL=$APIM_INT_URL/patient-data-manager/FHIR/R4/Bundle, \
+                                        MNS_EVENT_URL=$APIM_INT_URL/multicast-notification-service/events, \
+                                        CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
                                         JWKS_SECRET_NAME=$JWKS_SECRET}" || true
             wait_for_lambda_ready
             aws lambda update-function-code --function-name "$FN" \
@@ -285,14 +293,18 @@ jobs:
               --handler "${{ env.LAMBDA_HANDLER }}" \
               --zip-file "fileb://artifact.zip" \
               --role "${{ steps.role-select.outputs.lambda_role }}" \
+              --memory-size 512 \
+              --timeout 30 \
               --environment "Variables={APIM_TOKEN_EXPIRY_THRESHOLD=$EXPIRY_THRESHOLD, \
                                         APIM_PRIVATE_KEY_NAME=$PRIVATE_KEY, \
                                         APIM_API_KEY_NAME=$API_KEY, \
                                         APIM_MTLS_CERT_NAME=$MTLS_CERT, \
                                         APIM_MTLS_KEY_NAME=$MTLS_KEY, \
-                                        APIM_TOKEN_URL=$MOCK_URL/apim, \
-                                        PDM_BUNDLE_URL=$MOCK_URL/pdm, \
-                                        MNS_EVENT_URL=$MOCK_URL/mns, \
+                                        APIM_KEY_ID=$KEY_ID, \
+                                        APIM_TOKEN_URL=$APIM_INT_URL/oauth2/token, \
+                                        PDM_BUNDLE_URL=$APIM_INT_URL/patient-data-manager/FHIR/R4/Bundle, \
+                                        MNS_EVENT_URL=$APIM_INT_URL/multicast-notification-service/events, \
+                                        CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
                                         JWKS_SECRET_NAME=$JWKS_SECRET}" \
               --publish
             wait_for_lambda_ready

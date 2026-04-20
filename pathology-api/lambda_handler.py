@@ -13,6 +13,7 @@ from pathology_api.exception import ValidationError
 from pathology_api.fhir.r4.resources import Bundle, OperationOutcome
 from pathology_api.handler import handle_request
 from pathology_api.logging import get_logger
+from pathology_api.mns import MnsException
 from pathology_api.request_context import reset_correlation_id, set_correlation_id
 
 _logger = get_logger(__name__)
@@ -108,6 +109,15 @@ def handle_exception(exception: Exception) -> Response[str]:
         body=OperationOutcome.create_server_error(
             "An unexpected error has occurred. Please try again later."
         ),
+    )
+
+
+@_exception_handler(MnsException)
+def handle_mns_exception(exception: MnsException) -> Response[str]:
+    _logger.exception("Failed to publish MNS event: %s", exception)
+    return _with_default_headers(
+        status_code=500,
+        body=OperationOutcome.create_server_error("Failed to publish an event"),
     )
 
 

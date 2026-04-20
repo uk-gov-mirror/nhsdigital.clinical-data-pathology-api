@@ -6,6 +6,7 @@ import requests
 import requests.adapters
 
 from pathology_api.http import SessionManager
+from pathology_api.request_context import set_correlation_id
 
 
 class TestSessionManager:
@@ -143,14 +144,18 @@ class TestSessionManager:
         mock_session.return_value.mount.assert_called_once()
         mock_session.return_value.__exit__.assert_called_once()
 
-    def test_adapter_applies_timeout(self) -> None:
+    def test_adapter_applies_defaults(self) -> None:
         with patch.object(
             requests.adapters.HTTPAdapter, "send", autospec=True
         ) as mock_send:
+            expected_correlation_id = "correaltion-id"
+            set_correlation_id(expected_correlation_id)
+
             expected_timeout = timedelta(seconds=30)
             adapter = SessionManager._Adapter(timeout=expected_timeout.total_seconds())  # noqa: SLF001 - Private access for testing
 
             mock_request = Mock()
+            mock_request.headers = {}
 
             expected_response = Mock()
             mock_send.return_value = expected_response
@@ -165,6 +170,34 @@ class TestSessionManager:
                 timeout=expected_timeout.total_seconds(),
             )
 
+            assert mock_request.headers["X-Correlation-ID"] == expected_correlation_id
+
+    def test_adapter_overrides_defaults(self) -> None:
+        with patch.object(
+            requests.adapters.HTTPAdapter, "send", autospec=True
+        ) as mock_send:
+            expected_timeout = timedelta(seconds=30)
+            adapter = SessionManager._Adapter(timeout=expected_timeout.total_seconds())  # noqa: SLF001 - Private access for testing
+
+            mock_request = Mock()
+            expected_correlation_id = "correaltion-id"
+            mock_request.headers = {"X-Correlation-ID": expected_correlation_id}
+
+            expected_response = Mock()
+            mock_send.return_value = expected_response
+
+            response = adapter.send(mock_request, verify=True)
+            assert response == expected_response
+
+            mock_send.assert_called_once_with(
+                adapter,
+                mock_request,
+                verify=True,
+                timeout=expected_timeout.total_seconds(),
+            )
+
+            assert mock_request.headers["X-Correlation-ID"] == expected_correlation_id
+
     def test_adapter_request_error(self) -> None:
         with patch.object(
             requests.adapters.HTTPAdapter, "send", autospec=True
@@ -174,6 +207,9 @@ class TestSessionManager:
             adapter = SessionManager._Adapter(timeout=expected_timeout.total_seconds())  # noqa: SLF001 - Private access for testing
 
             mock_request = Mock()
+            mock_request.headers = {}
+
+            set_correlation_id("test-correlation-id")
 
             with pytest.raises(requests.RequestException, match="request failed"):
                 adapter.send(mock_request)
