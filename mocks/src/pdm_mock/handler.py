@@ -11,6 +11,7 @@ from aws_lambda_powertools.event_handler import Response
 from aws_lambda_powertools.event_handler.router import APIGatewayHttpRouter
 from common.logging import get_logger
 from common.storage_helper import BaseMockItem, StorageHelper
+from common.utils import check_valid_uuid4
 
 PDM_TABLE_NAME = os.environ["PDM_TABLE_NAME"]
 BRANCH_NAME = os.environ["DDB_INDEX_TAG"]
@@ -93,7 +94,10 @@ def _fetch_patient_from_payload(payload: dict[str, Any]) -> str | None:
 
 def handle_post_request(payload: dict[str, Any]) -> PDMResponse:
     if (patient := _fetch_patient_from_payload(payload)) in REQUEST_HANDLERS:
+        _logger.debug("Using magic patient id bypass, %s", patient)
         return REQUEST_HANDLERS[patient]()
+
+    _logger.debug("Not using magic patient id bypass")
 
     document_id = str(uuid4())
     created_document = {
@@ -115,7 +119,7 @@ def handle_post_request(payload: dict[str, Any]) -> PDMResponse:
 
     _write_document_to_table(item)
 
-    return {"status_code": 200, "response": created_document}
+    return {"status_code": 201, "response": created_document}
 
 
 def handle_get_request(document_id: str) -> PDMResponse:
@@ -127,10 +131,12 @@ def handle_get_request(document_id: str) -> PDMResponse:
 
 
 def _write_document_to_table(item: DocumentItem) -> None:
+    _logger.debug("Writing document to dynamodb table")
     storage_helper.put_item(item)
 
 
 def _get_document_from_table(document_id: str) -> DocumentItem:
+    _logger.debug("Retrieving document from dynamodb table")
     item = storage_helper.get_item_by_session_id(document_id)
     return cast("DocumentItem", item)
 
@@ -150,6 +156,20 @@ def create_document() -> Response[str]:
     request_headers = pdm_routes.current_event.headers
 
     check_authenticated(request_headers)
+
+    _logger.debug("Passed Auth Check")
+
+    x_request_id = request_headers.get("X-Request-ID")
+    if not x_request_id:
+        _logger.error("Missing X-Request-ID header.")
+        return _with_default_headers(
+            _create_operation_outcome(400, "Missing X-Request-ID header", "required")
+        )
+    if not check_valid_uuid4(x_request_id):
+        _logger.error("Invalid X-Request-ID header. Value provided: %s", x_request_id)
+        return _with_default_headers(
+            _create_operation_outcome(400, "Invalid X-Request-ID header", "invalid")
+        )
 
     try:
         payload = pdm_routes.current_event.json_body
@@ -174,7 +194,15 @@ def create_document() -> Response[str]:
         _logger.exception("Error handling PDM request")
         return Response(status_code=500, body=json.dumps({"error": str(err)}))
 
-    return _with_default_headers(response)
+    return Response(
+        body=json.dumps(response["response"]),
+        status_code=response["status_code"],
+        headers={
+            "Content-Type": "application/fhir+json",
+            "x-request-id": x_request_id,
+            "etag": 'W/"1"',
+        },
+    )
 
 
 @pdm_routes.get("/pdm/mock/Bundle/<document_id>")

@@ -46,7 +46,9 @@ class TestBundleEndpoint:
         assert response_bundle.meta is not None
         response_meta = response_bundle.meta
         assert response_meta.last_updated is not None
-        assert response_meta.version_id is None
+        assert response_meta.version_id == "1"
+
+        assert response.headers["etag"] == 'W/"1"'
 
     def test_no_payload_returns_error(self, client: Client) -> None:
         response = client.send_without_payload(

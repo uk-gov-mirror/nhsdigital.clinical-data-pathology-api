@@ -1,5 +1,5 @@
 import datetime
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from typing import Any
 from unittest.mock import patch
 
@@ -11,6 +11,7 @@ from pathology_api.fhir.r4.elements import (
     Extension,
     LiteralReference,
     LogicalReference,
+    Meta,
     OrganizationIdentifier,
     PatientIdentifier,
     ReferenceExtension,
@@ -22,14 +23,17 @@ from pathology_api.fhir.r4.resources import (
     PractitionerRole,
     ServiceRequest,
 )
+from pathology_api.request_context import reset_correlation_id, set_correlation_id
 from pathology_api.test_utils import BundleBuilder
 
 with (
     patch("pathology_api.environment.apim_authenticator"),
     patch("pathology_api.mns.create_event") as create_event_mock,
+    patch("pathology_api.pdm.post_document") as post_document_mock,
 ):
     from pathology_api.handler import handle_request
     from pathology_api.mns import MnsException
+    from pathology_api.pdm import PdmException, PdmResponse
 
 
 def _missing_resource_scenarios() -> list[Any]:
@@ -212,6 +216,15 @@ def _invalid_organization_scenarios() -> list[Any]:
 
 
 class TestHandleRequest:
+    @pytest.fixture(autouse=True)
+    def set_correlation_id_for_logger(self) -> Generator[None, None, None]:
+        set_correlation_id(
+            full_id="test_id_long",
+            short_id="test_id",
+        )
+        yield
+        reset_correlation_id()
+
     def _build_valid_test_result(self) -> Bundle:
         organisation_entry = Bundle.Entry(
             fullUrl="organisation",
@@ -263,10 +276,21 @@ class TestHandleRequest:
     ) -> None:
         # Arrange
         bundle = build_valid_test_result("nhs_number_1", "ods_code")
+        expected_bundle = Bundle.create(
+            id="generated_id",
+            type="document",
+            meta=Meta(
+                last_updated=datetime.datetime.now(tz=datetime.timezone.utc),
+                version_id="1",
+            ),
+            entry=bundle.entries,
+        )
+        expected_etag = "generated_etag"
 
-        before_call = datetime.datetime.now(tz=datetime.timezone.utc)
-        result_bundle = handle_request(bundle)
-        after_call = datetime.datetime.now(tz=datetime.timezone.utc)
+        post_document_mock.return_value = PdmResponse(expected_bundle, expected_etag)
+
+        pdm_response = handle_request(bundle)
+        result_bundle = pdm_response.bundle
 
         assert result_bundle is not None
 
@@ -280,10 +304,11 @@ class TestHandleRequest:
         created_meta = result_bundle.meta
 
         assert created_meta.last_updated is not None
-        assert before_call <= created_meta.last_updated
-        assert created_meta.last_updated <= after_call
+        assert created_meta.version_id == "1"
 
-        assert created_meta.version_id is None
+        assert pdm_response.etag == "generated_etag"
+
+        post_document_mock.assert_called_with(bundle)
 
         create_event_mock.assert_called_once_with(
             requesting_org="ods_code",
@@ -291,7 +316,7 @@ class TestHandleRequest:
             bundle_id=result_bundle.id,
         )
 
-    def test_handle_request_raises_error_when_create_bundle_fails(
+    def test_handle_request_raises_error_when_create_event_fails(
         self, build_valid_test_result: Callable[[str, str], Bundle]
     ) -> None:
         # Arrange
@@ -301,6 +326,19 @@ class TestHandleRequest:
         create_event_mock.side_effect = MnsException(expected_error_message)
 
         with pytest.raises(MnsException, match=expected_error_message):
+            handle_request(bundle)
+
+    def test_handle_request_raises_error_when_post_request_fails(
+        self,
+        build_valid_test_result: Callable[[str, str], Bundle],
+    ) -> None:
+        # Arrange
+        bundle = build_valid_test_result("nhs_number_1", "ods_code")
+
+        expected_error_message = "An unexpected internal server error has occured"
+        post_document_mock.side_effect = PdmException(expected_error_message)
+
+        with pytest.raises(PdmException, match=expected_error_message):
             handle_request(bundle)
 
     @pytest.mark.parametrize(

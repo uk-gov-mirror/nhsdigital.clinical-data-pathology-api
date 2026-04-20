@@ -1,9 +1,6 @@
-import uuid
-
 from pathology_api.exception import ValidationError
 from pathology_api.fhir.r4.elements import (
     LiteralReference,
-    Meta,
     OrganizationIdentifier,
     ReferenceExtension,
 )
@@ -16,6 +13,7 @@ from pathology_api.fhir.r4.resources import (
 )
 from pathology_api.logging import get_logger
 from pathology_api.mns import create_event
+from pathology_api.pdm import PdmResponse, post_document
 
 _logger = get_logger(__name__)
 
@@ -125,7 +123,7 @@ def _fetch_requesting_organisation(
     return organisation_identifiers[0]
 
 
-def handle_request(bundle: Bundle) -> Bundle:
+def handle_request(bundle: Bundle) -> PdmResponse:
     _logger.debug("Bundle entries: %s", bundle.entries)
     _validate_bundle(bundle)
 
@@ -146,22 +144,16 @@ def handle_request(bundle: Bundle) -> Bundle:
     if subject is None:
         raise ValidationError("Composition does not define a valid subject identifier")
 
-    return_bundle = Bundle.create(
-        id=str(uuid.uuid4()),
-        meta=Meta.with_last_updated(),
-        identifier=bundle.identifier,
-        type=bundle.bundle_type,
-        entry=bundle.entries,
-    )
-    _logger.debug("Return bundle: %s", return_bundle)
+    pdm_response = post_document(bundle)
+    _logger.debug("Return bundle: %s", pdm_response.bundle)
 
-    if return_bundle.id is None:
+    if pdm_response.bundle.id is None:
         raise ValueError("Bundle returned from PDM does not include an ID.")
 
     create_event(
         requesting_org=requesting_organisation.value,
         nhs_number=subject.identifier.value,
-        bundle_id=return_bundle.id,
+        bundle_id=pdm_response.bundle.id,
     )
 
-    return return_bundle
+    return pdm_response

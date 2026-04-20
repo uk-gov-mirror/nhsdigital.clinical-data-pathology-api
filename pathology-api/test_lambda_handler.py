@@ -12,6 +12,7 @@ with (
 ):
     from lambda_handler import handler
     from pathology_api.mns import MnsException
+    from pathology_api.pdm import PdmException, PdmResponse
 
 from pathology_api.exception import ValidationError
 from pathology_api.fhir.r4.elements import Meta
@@ -77,13 +78,14 @@ class TestHandler:
         post_event: dict[str, Any],
         context: LambdaContext,
     ) -> None:
-        expected_response = Bundle.create(
+        expected_bundle = Bundle.create(
             id="test-id",
             type="document",
             meta=Meta.with_last_updated(),
             entry=bundle.entries,
         )
-        handle_request_mock.return_value = expected_response
+        expected_etag = 'W/"1"'
+        handle_request_mock.return_value = PdmResponse(expected_bundle, expected_etag)
 
         response = handler(post_event, context)
 
@@ -94,11 +96,18 @@ class TestHandler:
         assert isinstance(response_body, str)
 
         response_bundle = Bundle.model_validate_json(response_body, by_alias=True)
-        assert response_bundle == expected_response
+        assert response_bundle == expected_bundle
 
+    @patch("lambda_handler.uuid4")
     def test_correlation_id_is_set_on_all_log_records_during_request(
-        self, caplog: pytest.LogCaptureFixture, bundle: Bundle, context: LambdaContext
+        self,
+        uuid_mock: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+        bundle: Bundle,
+        context: LambdaContext,
     ) -> None:
+        uuid_mock.return_value = "test_uuid"
+
         event = self._create_test_event(
             body=bundle.model_dump_json(by_alias=True),
             path_params="FHIR/R4/Bundle",
@@ -116,13 +125,19 @@ class TestHandler:
         for record in caplog.records:
             assert (
                 getattr(record, "correlation_id", None)
-                == "b876145d-1ebf-4e22-8ff8-275b570c1123"
+                == "b876145d-1ebf-4e22-8ff8-275b570c1123.test_uuid"
             )
 
+    @patch("lambda_handler.uuid4")
     def test_correlation_id_is_cleared_after_request(
-        self, caplog: pytest.LogCaptureFixture, bundle: Bundle, context: LambdaContext
+        self,
+        uuid_mock: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+        bundle: Bundle,
+        context: LambdaContext,
     ) -> None:
         # First request sets a correlation ID
+        uuid_mock.return_value = "test_uuid"
         event = self._create_test_event(
             body=bundle.model_dump_json(by_alias=True),
             path_params="FHIR/R4/Bundle",
@@ -134,7 +149,15 @@ class TestHandler:
             caplog.at_level(logging.DEBUG),
         ):
             handler(event, context)
+
+        for record in caplog.records:
+            assert (
+                getattr(record, "correlation_id", None)
+                == "c876145d-1ebf-4e22-8ff8-275b570c1ec4.test_uuid"
+            )
+
         caplog.clear()
+        uuid_mock.return_value = "different_uuid"
 
         # Second request with a different correlation ID — no bleed-through
         event2 = self._create_test_event(
@@ -152,7 +175,7 @@ class TestHandler:
         for record in caplog.records:
             assert (
                 getattr(record, "correlation_id", None)
-                == "d876145d-1ebf-4e22-8ff8-275b570c1ec4"
+                == "d876145d-1ebf-4e22-8ff8-275b570c1ec4.different_uuid"
             )
 
     def test_missing_correlation_id_header_returns_500(
@@ -209,8 +232,10 @@ class TestHandler:
         )
 
         handler(event, context)
-
-        assert get_correlation_id() == ""
+        with pytest.raises(
+            ValueError, match="Correlation ID is not set in the current context."
+        ):
+            get_correlation_id()
 
     def test_create_test_result_no_payload(self, context: LambdaContext) -> None:
         event = self._create_test_event(
@@ -306,6 +331,16 @@ class TestHandler:
                 },
                 500,
                 id="MnsException",
+            ),
+            pytest.param(
+                PdmException("Test PDM error"),
+                {
+                    "severity": "error",
+                    "code": "invalid",
+                    "diagnostics": "Test PDM error",
+                },
+                500,
+                id="PdmException",
             ),
         ],
     )
