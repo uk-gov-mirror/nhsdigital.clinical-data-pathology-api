@@ -47,7 +47,7 @@ jobs:
         run: |
           branch_name=${GITHUB_HEAD_REF:-$(echo $GITHUB_REF | sed 's#refs/heads/##')}
           echo "Current branch is '$branch_name'"
-          if gh pr list --head $branch_name | grep -q .; then
+          if gh pr list --head "$branch_name" | grep -q .; then
             echo "Pull request exists"
             echo "does_pull_request_exist=true" >> $GITHUB_OUTPUT
           else

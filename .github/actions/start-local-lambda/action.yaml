@@ -19,7 +19,8 @@ runs:
       shell: bash
       env:
         PYTHON_VERSION: ${{ inputs.python-version }}
+        DEPLOY_COMMAND: ${{ inputs.deploy-command }}
       run: |
         set -euo pipefail
-        echo "Starting local Lambda: '${{ inputs.deploy-command }}'"
-        bash -c "${{ inputs.deploy-command }}"
+        echo "Starting local Lambda: '$DEPLOY_COMMAND'"
+        bash -c "$DEPLOY_COMMAND"

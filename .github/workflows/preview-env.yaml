@@ -31,6 +31,7 @@ env:
   ENV: "remote"
   PR_NUMBER: ${{ github.event.pull_request.number }}
   HOST: "internal-dev.api.service.nhs.uk"
+  PROXY_ENV: "internal-dev"
 
 jobs:
   pr-preview:
@@ -67,8 +68,9 @@ jobs:
           DEPENDABOT_LAMBDA_ROLE_ARN: ${{ secrets.DEPENDABOT_LAMBDA_ROLE_ARN }}
           AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
           LAMBDA_ROLE_ARN: ${{ secrets.LAMBDA_ROLE_ARN }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: |
-          if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+          if [ "$GITHUB_ACTOR" = "dependabot[bot]" ]; then
             echo "aws_role=$DEPENDABOT_AWS_ROLE_ARN" >> "$GITHUB_OUTPUT"
             echo "lambda_role=$DEPENDABOT_LAMBDA_ROLE_ARN" >> "$GITHUB_OUTPUT"
           else
@@ -86,11 +88,13 @@ jobs:
         id: branch
         env:
           RAW_BRANCH_NAME: "${{ github.head_ref }}"
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: |
           branch=$RAW_BRANCH_NAME
-          if [ -z "$branch" ]; then branch="${{ github.ref_name }}"; fi
+          if [ -z "$branch" ]; then branch="$GITHUB_REF_NAME"; fi
 
-          if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+          if [ "$GITHUB_ACTOR" = "dependabot[bot]" ]; then
             safe="dependabot-${{ github.event.pull_request.number }}"
           else
             safe=$(echo "$branch" | sed -E 's/[^a-zA-Z0-9._-]+/-/g' | tr '[:upper:]' '[:lower:]')
@@ -102,10 +106,10 @@ jobs:
       - name: Compute function name
         id: names
         run: |
-          SAFE=${{ steps.branch.outputs.safe }}
-          PREFIX=${{ env.PREVIEW_PREFIX }}
-          MOCK_PREFIX=${{ env.MOCK_PREFIX }}
-          INT_PREFIX=${{ env.PREVIEW_INT_PREFIX }}
+          SAFE="${{ steps.branch.outputs.safe }}"
+          PREFIX="${{ env.PREVIEW_PREFIX }}"
+          MOCK_PREFIX="${{ env.MOCK_PREFIX }}"
+          INT_PREFIX="${{ env.PREVIEW_INT_PREFIX }}"
           MAX_FN_LEN=62
           MAX_PREFIX_LEN=${#PREFIX}
           if [ ${#MOCK_PREFIX} -gt "$MAX_PREFIX_LEN" ]; then
@@ -589,6 +593,7 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
+          proxygen-environment: ${{ env.PROXY_ENV}}
 
       - name: Deploy int preview API proxy
         if: github.event.action != 'closed' && github.event.pull_request.user.login != 'dependabot[bot]'
@@ -601,6 +606,7 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
+          proxygen-environment: ${{ env.PROXY_ENV}}
 
       - name: Tear down preview API proxy
         if: github.event.action == 'closed'
@@ -611,6 +617,7 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
+          proxygen-environment: ${{ env.PROXY_ENV}}
 
       - name: Tear down int preview API proxy
         if: github.event.action == 'closed' && github.event.pull_request.user.login != 'dependabot[bot]'
@@ -621,6 +628,7 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
+          proxygen-environment: ${{ env.PROXY_ENV}}
 
       - name: Retrieve Apigee Token
         id: apigee-token
