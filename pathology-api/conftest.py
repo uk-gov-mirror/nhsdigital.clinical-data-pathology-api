@@ -21,7 +21,7 @@ def build_valid_test_result() -> Callable[[str, str], Bundle]:
     def builder_function(patient: str, ods_code: str) -> Bundle:
         return BundleBuilder.with_defaults(
             composition_func=lambda service_request_url: Composition.create(
-                subject=LogicalReference(PatientIdentifier.from_nhs_number(patient)),
+                subject=LogicalReference(PatientIdentifier.create_with(patient)),
                 extension=[
                     # Using HTTP to match profile required by implementation guide.
                     ReferenceExtension(

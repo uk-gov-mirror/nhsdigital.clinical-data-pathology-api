@@ -1,5 +1,4 @@
 import datetime
-import uuid
 
 import pydantic
 import pytest
@@ -16,7 +15,6 @@ from .elements import (
     PatientIdentifier,
     ReferenceExtension,
     UnknownIdentifier,
-    UUIDIdentifier,
 )
 
 
@@ -64,23 +62,6 @@ class TestMeta:
 
         assert before_create <= meta.last_updated
         assert meta.last_updated <= after_create
-
-
-class TestUUIDIdentifier:
-    def test_create_with_value(self) -> None:
-        expected_uuid = uuid.UUID("12345678-1234-5678-1234-567812345678")
-        identifier = UUIDIdentifier.create_with_uuid(expected_uuid)
-
-        assert identifier.system == "https://tools.ietf.org/html/rfc4122"
-        assert identifier.value == str(expected_uuid)
-
-    def test_create_without_value(self) -> None:
-        identifier = UUIDIdentifier.create_with_uuid()
-
-        assert identifier.system == "https://tools.ietf.org/html/rfc4122"
-        # Validates that value is a valid UUID v4
-        parsed_uuid = uuid.UUID(identifier.value)
-        assert parsed_uuid.version == 4
 
 
 class _TestIdentifierContainer(BaseModel):
@@ -159,7 +140,7 @@ class TestPatientIdentifier:
     def test_create_from_nhs_number(self) -> None:
         """Test creating a PatientIdentifier from an NHS number."""
         nhs_number = "1234567890"
-        identifier = PatientIdentifier.from_nhs_number(nhs_number)
+        identifier = PatientIdentifier.create_with(nhs_number)
 
         assert identifier.system == "https://fhir.nhs.uk/Id/nhs-number"
         assert identifier.value == nhs_number
@@ -180,7 +161,7 @@ class TestLogicalReference:
 
     def test_create_with_patient_identifier(self) -> None:
         nhs_number = "nhs_number"
-        patient_id = PatientIdentifier.from_nhs_number(nhs_number)
+        patient_id = PatientIdentifier.create_with(nhs_number)
 
         reference = LogicalReference(identifier=patient_id)
 
@@ -190,8 +171,26 @@ class TestLogicalReference:
 
     def test_serialization(self) -> None:
         nhs_number = "nhs_number"
-        patient_id = PatientIdentifier.from_nhs_number(nhs_number)
+        patient_id = PatientIdentifier.create_with(nhs_number)
         reference = LogicalReference(identifier=patient_id)
+
+        container = self._TestContainer(reference=reference)
+        serialized = container.model_dump(by_alias=True, exclude_none=True)
+
+        expected = {
+            "reference": {
+                "identifier": {
+                    "system": "https://fhir.nhs.uk/Id/nhs-number",
+                    "value": "nhs_number",
+                }
+            }
+        }
+        assert serialized == expected
+
+    def test_serialization_with_reference(self) -> None:
+        nhs_number = "nhs_number"
+        patient_id = PatientIdentifier.create_with(nhs_number)
+        reference = LogicalReference(identifier=patient_id, reference=nhs_number)
 
         container = self._TestContainer(reference=reference)
         serialized = container.model_dump(by_alias=True)
@@ -201,7 +200,8 @@ class TestLogicalReference:
                 "identifier": {
                     "system": "https://fhir.nhs.uk/Id/nhs-number",
                     "value": "nhs_number",
-                }
+                },
+                "reference": nhs_number,
             }
         }
         assert serialized == expected
@@ -218,7 +218,30 @@ class TestLogicalReference:
 
         container = self._TestContainer.model_validate(data)
 
+        assert container.reference.reference is None
         created_identifier = container.reference.identifier
+
+        assert isinstance(created_identifier, PatientIdentifier)
+        assert created_identifier.system == "https://fhir.nhs.uk/Id/nhs-number"
+        assert created_identifier.value == "nhs_number"
+
+    def test_deserialization_with_reference(self) -> None:
+        expected_reference = "expected-reference"
+        data = {
+            "reference": {
+                "identifier": {
+                    "system": "https://fhir.nhs.uk/Id/nhs-number",
+                    "value": "nhs_number",
+                },
+                "reference": expected_reference,
+            }
+        }
+
+        container = self._TestContainer.model_validate(data)
+
+        assert container.reference.reference == expected_reference
+        created_identifier = container.reference.identifier
+
         assert isinstance(created_identifier, PatientIdentifier)
         assert created_identifier.system == "https://fhir.nhs.uk/Id/nhs-number"
         assert created_identifier.value == "nhs_number"
