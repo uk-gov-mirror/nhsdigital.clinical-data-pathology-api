@@ -1,11 +1,11 @@
 meta {
-  name: Post Document Bundle via APIM - INT
+  name: Test_With_Multiple_Identifiers_For_An_Organisation
   type: http
-  seq: 3
+  seq: 25
 }
 
 post {
-  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pri-{{PR_NUMBER}}/FHIR/R4/Bundle
+  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pr-{{PR_NUMBER}}/FHIR/R4/Bundle
   body: json
   auth: inherit
 }
@@ -65,12 +65,21 @@ body:json {
             {
               "system": "https://fhir.nhs.uk/Id/ods-organization-code",
               "value": "testOrg"
+            },
+            {
+              "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+              "value": "secondOrg"
             }
           ]
         }
       }
     ]
   }
+}
+
+assert {
+  res.status: eq 400
+  res.body.issue[0].diagnostics: eq Organization (organization) defines multiple identifier values. Identifier values: ['testOrg', 'secondOrg']
 }
 
 settings {

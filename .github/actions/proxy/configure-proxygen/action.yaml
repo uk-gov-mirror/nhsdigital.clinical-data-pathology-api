@@ -28,14 +28,19 @@ runs:
         proxygen --version
 
     - name: Configure proxygen account details
+      env:
+        API_NAME: "${{ inputs.proxygen-api-name }}"
+        KEY_SECRET: "${{ inputs.proxygen-key-secret }}"
+        KEY_ID: "${{ inputs.proxygen-key-id }}"
+        CLIENT_ID: "${{ inputs.proxygen-client-id }}"
       shell: bash
       working-directory: proxygen
       run: |
         cp settings.template.yaml $HOME/.proxygen/settings.yaml
-        yq eval '.api = "${{ inputs.proxygen-api-name }}"' -i $HOME/.proxygen/settings.yaml
+        yq eval '.api = env(API_NAME)' -i $HOME/.proxygen/settings.yaml
 
-        printf "%s" "${{ inputs.proxygen-key-secret }}" > /tmp/proxygen_private_key.pem
+        printf "%s" "$KEY_SECRET" > /tmp/proxygen_private_key.pem
         cp credentials.template.yaml $HOME/.proxygen/credentials.yaml
         yq eval '.private_key_path = "/tmp/proxygen_private_key.pem"' -i $HOME/.proxygen/credentials.yaml
-        yq eval '.key_id = "${{ inputs.proxygen-key-id }}"' -i $HOME/.proxygen/credentials.yaml
-        yq eval '.client_id = "${{ inputs.proxygen-client-id }}"' -i $HOME/.proxygen/credentials.yaml
+        yq eval '.key_id = env(KEY_ID)' -i $HOME/.proxygen/credentials.yaml
+        yq eval '.client_id = env(CLIENT_ID)' -i $HOME/.proxygen/credentials.yaml

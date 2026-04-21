@@ -26,11 +26,12 @@ runs:
       env:
         APIGEE_ACCESS_TOKEN: ${{ inputs.apigee-access-token }}
         ENV: ${{ inputs.env }}
+        TEST_TYPE: ${{ inputs.test-type }}
       run: |
         if [[ -n "${APIGEE_ACCESS_TOKEN}" ]]; then
           echo "::add-mask::${APIGEE_ACCESS_TOKEN}"
         fi
-        make test-${{ inputs.test-type }}
+        make test-${TEST_TYPE}
 
     - name: "Upload ${{ inputs.test-type }} test results"
       if: always()
@@ -44,8 +45,10 @@ runs:
       id: check
       if: always()
       shell: bash
+      env:
+        TEST_TYPE: ${{ inputs.test-type }}
       run: |
-        if [[ -f "pathology-api/test-artefacts/${{ inputs.test-type }}-tests.xml" ]]; then
+        if [[ -f "pathology-api/test-artefacts/${TEST_TYPE}-tests.xml" ]]; then
           echo "exists=true" >> "$GITHUB_OUTPUT"
         else
           echo "exists=false" >> "$GITHUB_OUTPUT"

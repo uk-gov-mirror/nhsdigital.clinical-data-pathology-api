@@ -1,11 +1,11 @@
 meta {
-  name: Post Document Bundle via APIM - INT
+  name: Test_Without_PractionerRole
   type: http
-  seq: 3
+  seq: 5
 }
 
 post {
-  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pri-{{PR_NUMBER}}/FHIR/R4/Bundle
+  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pr-{{PR_NUMBER}}/FHIR/R4/Bundle
   body: json
   auth: inherit
 }
@@ -49,15 +49,6 @@ body:json {
         }
       },
       {
-        "fullUrl": "practitionerrole",
-        "resource": {
-          "resourceType": "PractitionerRole",
-          "organization": {
-            "reference": "organization"
-          }
-        }
-      },
-      {
         "fullUrl": "organization",
         "resource": {
           "resourceType": "Organization",
@@ -71,6 +62,11 @@ body:json {
       }
     ]
   }
+}
+
+assert {
+  res.status: eq 400
+  res.body.issue[0].diagnostics: eq Document must include a PractitionerRole resource
 }
 
 settings {

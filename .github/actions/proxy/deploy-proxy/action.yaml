@@ -23,6 +23,9 @@ inputs:
   proxygen-api-name:
     description: 'Proxygen API name'
     required: true
+  proxygen-environment:
+    description: 'Proxygen environment'
+    required: true
 
 runs:
   using: composite
@@ -36,13 +39,20 @@ runs:
         proxygen-api-name: ${{ inputs.proxygen-api-name }}
 
     - name: Inject secrets into openapi.yaml for deploying proxy
+      env:
+        TARGET_URL: "${{ inputs.target-url }}"
+        MTLS_SECRET_NAME: "${{ inputs.mtls-secret-name }}"
       shell: bash
       run: |
         cat pathology-api/openapi.yaml proxygen/x-nhsd-apim.template.yaml > /tmp/proxy-specification.yaml
 
-        yq eval '.x-nhsd-apim.target.url = "${{ inputs.target-url }}" | .x-nhsd-apim.target.security.secret = "${{ inputs.mtls-secret-name }}"' -i /tmp/proxy-specification.yaml
+        yq eval '.x-nhsd-apim.target.url = env(TARGET_URL) | .x-nhsd-apim.target.security.secret = env(MTLS_SECRET_NAME)' -i /tmp/proxy-specification.yaml
 
     - name: Deploy API proxy
+      env:
+        ENVIRONMENT: "${{ inputs.proxygen-environment }}"
+        BASE_PATH: "${{ inputs.proxy-base-path }}"
       shell: bash
       run: |
-        proxygen instance deploy internal-dev ${{ inputs.proxy-base-path }} /tmp/proxy-specification.yaml --no-confirm
+
+        proxygen instance deploy "$ENVIRONMENT" "$BASE_PATH" /tmp/proxy-specification.yaml --no-confirm

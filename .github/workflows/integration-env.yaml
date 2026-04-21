@@ -1,0 +1,379 @@
+name: Integration Environment
+
+on:
+  pull_request:
+    branches: [integration]
+    types: [closed]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-west-2
+  PREVIEW_PREFIX: int-
+  PYTHON_VERSION: 3.14
+  LAMBDA_RUNTIME: python3.14
+  LAMBDA_HANDLER: lambda_handler.handler
+  MTLS_SECRET_NAME: ${{ vars.PREVIEW_ENV_MTLS_SECRET_NAME }}
+  PROXYGEN_KEY_ID: ${{ vars.PREVIEW_ENV_PROXYGEN_KEY_ID }}
+  PROXYGEN_CLIENT_ID: ${{ vars.PREVIEW_ENV_PROXYGEN_CLIENT_ID }}
+  PROXYGEN_API_NAME: ${{ vars.PROXYGEN_API_NAME }}
+  BASE_URL: "https://internal-dev.api.service.nhs.uk/${{ vars.PROXYGEN_API_NAME }}-integration"
+  ENV: "remote"
+  HOST: "internal-dev.api.service.nhs.uk"
+
+jobs:
+  integration-environment:
+    name: "Deploy Integration Environment"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+
+    permissions:
+      id-token: write
+      contents: read
+
+    concurrency:
+      group: integration-environment
+      cancel-in-progress: true
+
+    outputs:
+      function_name: ${{ steps.names.outputs.function_name }}
+      int_url: ${{ steps.names.outputs.int_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: integration
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+
+      - name: Setup Python project
+        uses: ./.github/actions/setup-python-project
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Package artifacts
+        run: |
+          make build
+
+      - name: Select AWS role inputs
+        id: role-select
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN_INT }}
+          LAMBDA_ROLE_ARN: ${{ secrets.LAMBDA_ROLE_ARN_INT }}
+        run: |
+          echo "aws_role=$AWS_ROLE_ARN" >> "$GITHUB_OUTPUT"
+          echo "lambda_role=$LAMBDA_ROLE_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@5e19c1aa7acd2e02c5110eaf77eacd29039cca28
+        with:
+          role-to-assume: ${{ steps.role-select.outputs.aws_role }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sanitize branch name
+        id: branch
+        env:
+          RAW_BRANCH_NAME: "${{ github.head_ref }}"
+        run: |
+          branch=$RAW_BRANCH_NAME
+
+          safe="integration"
+
+          echo "branch=$branch" >> $GITHUB_OUTPUT
+          echo "safe=$safe" >> $GITHUB_OUTPUT
+
+      - name: Compute function name
+        id: names
+        run: |
+          SAFE=${{ steps.branch.outputs.safe }}
+          PREFIX=${{ env.PREVIEW_PREFIX }}
+          MAX_FN_LEN=62
+          MAX_PREFIX_LEN=${#PREFIX}
+          MAX_SAFE_LEN=$((MAX_FN_LEN - MAX_PREFIX_LEN))
+          if [ ${#SAFE} -gt "$MAX_SAFE_LEN" ]; then
+            SAFE=${SAFE:0:MAX_SAFE_LEN}
+          fi
+          FN="${PREFIX}${SAFE}"
+
+          echo "function_name=$FN" >> "$GITHUB_OUTPUT"
+          URL="https://${SAFE}.int.endpoints.${{ env.PROXYGEN_API_NAME }}.national.nhs.uk"
+          echo "int_url=$URL" >> "$GITHUB_OUTPUT"
+
+      # ---------- Handle application with int ----------
+      - name: Create or update preview Lambda with int
+        env:
+          MOCK_URL: ${{ steps.names.outputs.int_url }}
+          TOKEN_EXPIRY_THRESHOLD: ${{ secrets.APIM_TOKEN_EXPIRY_THRESHOLD }}
+          JWKS_SECRET_NAME: ${{ secrets.JWKS_SECRET }}
+          APIM_PRIVATE_KEY: ${{ secrets.APIM_PRIVATE_KEY }}
+          APIM_APIKEY: ${{ secrets.APIM_APIKEY }}
+          API_MTLS_CERT: ${{ secrets.API_MTLS_CERT }}
+          API_MTLS_KEY: ${{ secrets.API_MTLS_KEY }}
+          APIM_KEY_ID: ${{ secrets.APIM_KEY_ID }}
+          CLIENT_REQUEST_TIMEOUT: ${{ secrets.CLIENT_REQUEST_TIMEOUT }}
+        run: |
+          cd pathology-api/target/
+          FN="${{ steps.names.outputs.function_name }}"
+          EXPIRY_THRESHOLD="${TOKEN_EXPIRY_THRESHOLD:-30s}"
+          JWKS_SECRET="${JWKS_SECRET_NAME:-/cds/pathology/int/jwks/secret}"
+          PRIVATE_KEY="${APIM_PRIVATE_KEY:-/cds/pathology/int/apim/private-key}"
+          API_KEY="${APIM_APIKEY:-/cds/pathology/int/apim/api-key}"
+          MTLS_CERT="${API_MTLS_CERT:-/cds/pathology/int/mtls/client1-key-public}"
+          MTLS_KEY="${API_MTLS_KEY:-/cds/pathology/int/mtls/client1-key-secret}"
+          KEY_ID="${APIM_KEY_ID:-DEV-1}"
+          CLIENT_TIMEOUT="${CLIENT_REQUEST_TIMEOUT:-10s}"
+          echo "Deploying preview function: $FN"
+          wait_for_lambda_ready() {
+            while true; do
+            status=$(aws lambda get-function-configuration --function-name "$FN" \
+                        --query 'LastUpdateStatus' \
+                        --output text 2>/dev/null || echo "Unknown")
+            if [ "$status" = "Successful" ] || [ "$status" = "Unknown" ]; then
+              break
+            fi
+            if [ "$status" = "Failed" ]; then
+              echo "Lambda is in Failed state; check logs." >&2
+              exit 1
+            fi
+            echo "Lambda update status: $status — waiting..."
+            sleep 5
+          done
+          }
+          if aws lambda get-function --function-name "$FN" >/dev/null 2>&1; then
+            wait_for_lambda_ready
+            aws lambda update-function-configuration --function-name "$FN" \
+              --handler "${{ env.LAMBDA_HANDLER }}" \
+              --memory-size 512 \
+              --timeout 30 \
+              --environment "Variables={APIM_TOKEN_EXPIRY_THRESHOLD=$EXPIRY_THRESHOLD, \
+                                        APIM_PRIVATE_KEY_NAME=$PRIVATE_KEY, \
+                                        APIM_API_KEY_NAME=$API_KEY, \
+                                        APIM_MTLS_CERT_NAME=$MTLS_CERT, \
+                                        APIM_MTLS_KEY_NAME=$MTLS_KEY, \
+                                        APIM_KEY_ID=$KEY_ID, \
+                                        APIM_TOKEN_URL=$MOCK_URL/apim/oauth2/token, \
+                                        PDM_BUNDLE_URL=$MOCK_URL/apim/check_auth, \
+                                        MNS_EVENT_URL=$MOCK_URL/mns, \
+                                        CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
+                                        JWKS_SECRET_NAME=$JWKS_SECRET}" || true
+            wait_for_lambda_ready
+            aws lambda update-function-code --function-name "$FN" \
+              --zip-file "fileb://artifact.zip" \
+              --publish
+          else
+            aws lambda create-function --function-name "$FN" \
+              --runtime "${{ env.LAMBDA_RUNTIME }}" \
+              --handler "${{ env.LAMBDA_HANDLER }}" \
+              --zip-file "fileb://artifact.zip" \
+              --role "${{ steps.role-select.outputs.lambda_role }}" \
+              --memory-size 512 \
+              --timeout 30 \
+              --environment "Variables={APIM_TOKEN_EXPIRY_THRESHOLD=$EXPIRY_THRESHOLD, \
+                                        APIM_PRIVATE_KEY_NAME=$PRIVATE_KEY, \
+                                        APIM_API_KEY_NAME=$API_KEY, \
+                                        APIM_KEY_ID=$KEY_ID, \
+                                        APIM_MTLS_CERT_NAME=$MTLS_CERT, \
+                                        APIM_MTLS_KEY_NAME=$MTLS_KEY, \
+                                        APIM_TOKEN_URL=$MOCK_URL/apim/oauth2/token, \
+                                        PDM_BUNDLE_URL=$MOCK_URL/apim/check_auth, \
+                                        MNS_EVENT_URL=$MOCK_URL/mns, \
+                                        CLIENT_TIMEOUT=$CLIENT_TIMEOUT, \
+                                        JWKS_SECRET_NAME=$JWKS_SECRET}" \
+              --publish
+            wait_for_lambda_ready
+          fi
+
+      - name: Output function name with mock
+        run: |
+          echo "function = ${{ steps.names.outputs.function_name }}"
+          echo "url      = ${{ steps.names.outputs.int_url }}"
+
+      # ---------- Wait on AWS tasks and notify ----------
+      - name: Get mTLS certs for testing
+        id: mtls-certs
+        uses: aws-actions/aws-secretsmanager-get-secrets@2cb1a461cbd4865ac4299648312e4704c646cd53
+        with:
+          secret-ids: |
+            /cds/pathology/int/mtls/client1-key-secret
+            /cds/pathology/int/mtls/client1-key-public
+          name-transformation: lowercase
+
+      - name: Smoke test preview URL
+        id: smoke-test
+        env:
+          INT_URL: ${{ steps.names.outputs.int_url }}
+        run: |
+          if [ -z "$INT_URL" ] || [ "$INT_URL" = "null" ]; then
+            echo "Integration URL missing"
+            echo "http_status=missing" >> "$GITHUB_OUTPUT"
+            echo "http_result=missing-url" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Reachability check: allow 404 (app routes might not exist yet) but fail otherwise
+          printf '%s' "$_cds_pathology_int_mtls_client1_key_secret" > /tmp/client1-key.pem
+          printf '%s' "$_cds_pathology_int_mtls_client1_key_public" > /tmp/client1-cert.pem
+          STATUS=$(curl \
+                      --cert /tmp/client1-cert.pem \
+                      --key /tmp/client1-key.pem \
+                      --silent \
+                      --output /tmp/preview.headers \
+                      --write-out '%{http_code}' \
+                      --head \
+                      --max-time 30 \
+                      -X GET "$INT_URL"/_status || true)
+          rm -f /tmp/client1-key.pem
+          rm -f /tmp/client1-cert.pem
+
+          if [ "$STATUS" = "404" ]; then
+            echo "Integration responded with expected 404"
+            echo "http_status=404" >> "$GITHUB_OUTPUT"
+            echo "http_result=allowed-404" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$STATUS" =~ ^[0-9]{3}$ ]] && [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "Integration responded with status $STATUS"
+            echo "http_status=$STATUS" >> "$GITHUB_OUTPUT"
+            echo "http_result=success" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Preview responded with unexpected status $STATUS"
+          if [ -f /tmp/preview.headers ]; then
+            echo "Response headers:"
+            cat /tmp/preview.headers
+          fi
+          echo "http_status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "http_result=unexpected-status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Get proxygen machine user details
+        id: proxygen-machine-user
+        uses: aws-actions/aws-secretsmanager-get-secrets@2cb1a461cbd4865ac4299648312e4704c646cd53
+        with:
+          secret-ids: /cds/pathology/int/proxygen/proxygen-key-secret
+          name-transformation: lowercase
+
+      - name: Deploy preview API proxy
+        uses: ./.github/actions/proxy/deploy-proxy
+        with:
+          mtls-secret-name: ${{ env.MTLS_SECRET_NAME }}
+          target-url: ${{ steps.names.outputs.int_url }}
+          proxy-base-path: "${{ env.PROXYGEN_API_NAME }}-integration"
+          proxygen-key-secret: ${{ env._cds_pathology_int_proxygen_proxygen_key_secret }}
+          proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
+          proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
+          proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
+
+      - name: Retrieve Apigee Token
+        id: apigee-token
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APIGEE_TOKEN="$(proxygen pytest-nhsd-apim get-token | jq -r '.pytest_nhsd_apim_token' 2>/dev/null)"
+          if [ -z "$APIGEE_TOKEN" ] || [ "$APIGEE_TOKEN" = "null" ]; then
+            echo "::error::Failed to retrieve Apigee token"
+            exit 1
+          fi
+
+          echo "::add-mask::$APIGEE_TOKEN"
+          printf 'apigee-access-token=%s\n' "$APIGEE_TOKEN" >> "$GITHUB_OUTPUT"
+          echo "Token retrieved successfully (length: ${#APIGEE_TOKEN})"
+
+      - name: "Create coverage artefact name"
+        id: create-name
+        uses: ./.github/actions/create-artefact-name
+        with:
+          prefix: coverage
+
+      # ---------- Test suites ----------
+      - name: "Run unit tests"
+        uses: ./.github/actions/run-test-suite
+        with:
+          test-type: unit
+          env: local
+
+      - name: "Run contract tests"
+        uses: ./.github/actions/run-test-suite
+        with:
+          test-type: contract
+          apigee-access-token: ${{ steps.apigee-token.outputs.apigee-access-token }}
+
+      - name: "Run schema validation tests"
+        uses: ./.github/actions/run-test-suite
+        with:
+          test-type: schema
+          apigee-access-token: ${{ steps.apigee-token.outputs.apigee-access-token }}
+
+      - name: "Run integration tests"
+        uses: ./.github/actions/run-test-suite
+        with:
+          test-type: integration
+          apigee-access-token: ${{ steps.apigee-token.outputs.apigee-access-token }}
+
+      - name: "Run acceptance tests"
+        uses: ./.github/actions/run-test-suite
+        with:
+          test-type: acceptance
+          apigee-access-token: ${{ steps.apigee-token.outputs.apigee-access-token }}
+
+      # ---------- Coverage & reporting ----------
+      - name: "Download all test coverage artefacts"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: pathology-api/test-artefacts/
+          merge-multiple: false
+      - name: "Download mock test coverage artefacts"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: mocks/test-artefacts/
+          merge-multiple: false
+      - name: "Merge coverage data"
+        run: make test-coverage
+      - name: "Rename coverage XML with unique name"
+        run: |
+          cd pathology-api/test-artefacts
+          mv coverage-merged.xml "${{ steps.create-name.outputs.artefact-name }}.xml"
+          cd ../..
+          cd mocks/test-artefacts
+          mv coverage-merged.xml ${{ steps.create-name.outputs.artefact-name }}-mocks.xml
+      - name: "Upload combined coverage report"
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ${{ steps.create-name.outputs.artefact-name }}
+          path: pathology-api/test-artefacts
+          retention-days: 30
+      - name: "Upload mocks coverage report"
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ${{ steps.create-name.outputs.artefact-name }}-mocks
+          path: mocks/test-artefacts
+          retention-days: 30
+      - name: "Download merged coverage report"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ steps.create-name.outputs.artefact-name }}
+          path: coverage-reports/
+      - name: "Download mock coverage report"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ steps.create-name.outputs.artefact-name }}-mocks
+          path: coverage-reports/
+      - name: "SonarCloud Scan"
+        uses: SonarSource/sonarqube-scan-action@299e4b793aaa83bf2aba7c9c14bedbb485688ec4 #7.1.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=${{ vars.SONAR_ORGANISATION_KEY }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.python.coverage.reportPaths=coverage-reports/${{ steps.create-name.outputs.artefact-name }}.xml,coverage-reports/${{ steps.create-name.outputs.artefact-name }}-mocks.xml
+
+      # ---------- Perform vuln scan and notify ----------
+      # - name: Filesystem vuln scan
+      # - name: SBOM generation

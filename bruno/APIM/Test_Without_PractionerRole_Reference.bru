@@ -1,11 +1,11 @@
 meta {
-  name: Post Document Bundle via APIM - INT
+  name: Test_Without_PractionerRole_Reference
   type: http
-  seq: 3
+  seq: 16
 }
 
 post {
-  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pri-{{PR_NUMBER}}/FHIR/R4/Bundle
+  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pr-{{PR_NUMBER}}/FHIR/R4/Bundle
   body: json
   auth: inherit
 }
@@ -53,7 +53,7 @@ body:json {
         "resource": {
           "resourceType": "PractitionerRole",
           "organization": {
-            "reference": "organization"
+            "reference": ""
           }
         }
       },
@@ -71,6 +71,11 @@ body:json {
       }
     ]
   }
+}
+
+assert {
+  res.status: eq 400
+  res.body.issue[0].diagnostics: eq "Organization resource not found with provided reference. Provided reference: "
 }
 
 settings {
