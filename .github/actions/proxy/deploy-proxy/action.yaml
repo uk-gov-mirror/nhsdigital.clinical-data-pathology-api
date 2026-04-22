@@ -26,6 +26,10 @@ inputs:
   proxygen-environment:
     description: 'Proxygen environment'
     required: true
+  pr-number:
+    description: 'Pull request number. When provided, appends "(PR-<number>)" to the API title in the proxy specification to distinguish PR-based proxies in the developer portal.'
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -47,6 +51,14 @@ runs:
         cat pathology-api/openapi.yaml proxygen/x-nhsd-apim.template.yaml > /tmp/proxy-specification.yaml
 
         yq eval '.x-nhsd-apim.target.url = env(TARGET_URL) | .x-nhsd-apim.target.security.secret = env(MTLS_SECRET_NAME)' -i /tmp/proxy-specification.yaml
+
+    - name: Append PR number to API title
+      if: ${{ inputs.pr-number != '' }}
+      env:
+        PR_NUMBER: "${{ inputs.pr-number }}"
+      shell: bash
+      run: |
+        yq eval '.info.title = .info.title + " (PR-" + env(PR_NUMBER) + ")"' -i /tmp/proxy-specification.yaml
 
     - name: Deploy API proxy
       env:

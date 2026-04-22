@@ -594,6 +594,7 @@ jobs:
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
           proxygen-environment: ${{ env.PROXY_ENV}}
+          pr-number: ${{ github.event.pull_request.number }}
 
       - name: Deploy int preview API proxy
         if: github.event.action != 'closed' && github.event.pull_request.user.login != 'dependabot[bot]'
@@ -607,6 +608,7 @@ jobs:
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
           proxygen-environment: ${{ env.PROXY_ENV}}
+          pr-number: "${{ github.event.pull_request.number }}i"
 
       - name: Tear down preview API proxy
         if: github.event.action == 'closed'
