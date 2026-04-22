@@ -42,7 +42,7 @@ else:
 )
 @app.route("/<path:path_params>", methods=["POST", "GET"])
 def forward_request(path_params):
-    x_correlation_id = request.headers.get("X-Correlation-ID")
+    x_correlation_id = request.headers.get("X-Correlation-ID", "")
     forwarded_headers = {k.lower(): v for k, v in request.headers.items()}
     forwarded_headers["nhsd-correlation-id"] = x_correlation_id
 
@@ -74,6 +74,11 @@ def forward_request(path_params):
 
     app.logger.info("response: %s", response.text)
     response_data = response.json()
+
+    # proxygen adds x correlation id to the response headers if one is sent,
+    # so we can mimic that here, as we currently dont manually return it
+    if x_correlation_id:
+        response_data["headers"]["X-Correlation-ID"] = x_correlation_id
 
     output = (
         (

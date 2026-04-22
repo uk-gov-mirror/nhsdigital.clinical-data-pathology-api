@@ -172,7 +172,7 @@ class TestPDMClient:
         )
 
         with pytest.raises(
-            PdmException, match="Failed to send document: error message"
+            PdmException, match="Failed to store document: error message"
         ):
             post_document(bundle)
 
@@ -195,6 +195,6 @@ class TestPDMClient:
         )
 
         with pytest.raises(
-            PdmException, match="Failed to send document: error message"
+            PdmException, match="Failed to store document: error message"
         ):
             post_document(bundle)

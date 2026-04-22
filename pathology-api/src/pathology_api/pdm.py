@@ -59,4 +59,4 @@ def post_document(document: Bundle) -> PdmResponse:
     # all other responses including 5xx and 4xx return same format for now
     else:
         pdm_error = response.text
-        raise PdmException(f"Failed to send document: {pdm_error}")
+        raise PdmException(f"Failed to store document: {pdm_error}")

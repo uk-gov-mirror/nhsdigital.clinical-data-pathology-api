@@ -73,15 +73,34 @@ REQUEST_HANDLERS: dict[str, RequestHandler] = {
 }
 
 
+def _get_patient_id_from_resource(resource: dict[str, Any]) -> Any:
+    resource_type = resource.get("resourceType")
+    if resource_type != "Composition" and resource_type != "Patient":
+        return None
+
+    if resource_type == "Composition":
+        resource = resource.get("subject", {})
+
+    if "identifier" not in resource or len(resource["identifier"]) == 0:
+        return None
+
+    patient = (
+        resource["identifier"][0].get("value")
+        if type(resource["identifier"]) is list
+        else resource["identifier"].get("value")
+    )
+    if not patient:
+        return None
+
+    return patient
+
+
 def _fetch_patient_from_payload(payload: dict[str, Any]) -> str | None:
     patient_values = [
         str(patient)
         for entry in payload.get("entry", [])
         if (resource := entry.get("resource"))
-        and resource.get("resourceType") == "Patient"
-        and "identifier" in resource
-        and len(resource["identifier"]) > 0
-        and (patient := resource.get("identifier")[0].get("value"))
+        and (patient := _get_patient_id_from_resource(resource))
     ]
 
     if not patient_values:

@@ -33,6 +33,7 @@ class TestBundleEndpoint:
             response.headers["X-Correlation-ID"]
             == "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"
         )
+        assert response.headers["etag"] == 'W/"1"'
 
         response_data = response.json()
         response_bundle = Bundle.model_validate(response_data, by_alias=True)
@@ -46,16 +47,14 @@ class TestBundleEndpoint:
         assert response_bundle.meta is not None
         response_meta = response_bundle.meta
 
-        print(f"Response meta: {response_meta}")
-
         assert response_meta.last_updated is not None
         assert response_meta.version_id == "1"
 
-        assert response.headers["etag"] == 'W/"1"'
-
     def test_no_payload_returns_error(self, client: Client) -> None:
         response = client.send_without_payload(
-            request_method="POST", path="FHIR/R4/Bundle"
+            request_method="POST",
+            path="FHIR/R4/Bundle",
+            headers={"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
         )
         assert response.status_code == 400
 
@@ -76,7 +75,12 @@ class TestBundleEndpoint:
         assert response.status_code == 400
 
     def test_empty_payload_returns_error(self, client: Client) -> None:
-        response = client.send(data="", request_method="POST", path="FHIR/R4/Bundle")
+        response = client.send(
+            data="",
+            request_method="POST",
+            path="FHIR/R4/Bundle",
+            headers={"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
+        )
         assert response.status_code == 400
 
         response_data = response.json()
@@ -346,7 +350,10 @@ class TestBundleEndpoint:
         self, client: Client, payload: dict[str, Any], expected_diagnostic: str
     ) -> None:
         response = client.send(
-            data=json.dumps(payload), request_method="POST", path="FHIR/R4/Bundle"
+            data=json.dumps(payload),
+            request_method="POST",
+            path="FHIR/R4/Bundle",
+            headers={"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
         )
         assert response.status_code == 400
 
@@ -548,7 +555,10 @@ class TestBundleEndpoint:
         }
 
         response = client.send(
-            data=json.dumps(bundle), request_method="POST", path="FHIR/R4/Bundle"
+            data=json.dumps(bundle),
+            request_method="POST",
+            path="FHIR/R4/Bundle",
+            headers={"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
         )
         assert response.status_code == 400
 
@@ -653,7 +663,10 @@ class TestBundleEndpoint:
         }
 
         response = client.send(
-            data=json.dumps(bundle), request_method="POST", path="FHIR/R4/Bundle"
+            data=json.dumps(bundle),
+            request_method="POST",
+            path="FHIR/R4/Bundle",
+            headers={"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
         )
         assert response.status_code == 400
 
@@ -759,7 +772,10 @@ class TestBundleEndpoint:
         }
 
         response = client.send(
-            data=json.dumps(bundle), request_method="POST", path="FHIR/R4/Bundle"
+            data=json.dumps(bundle),
+            request_method="POST",
+            path="FHIR/R4/Bundle",
+            headers={"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
         )
         assert response.status_code == 400
 
@@ -870,7 +886,10 @@ class TestBundleEndpoint:
         }
 
         response = client.send(
-            data=json.dumps(bundle), request_method="POST", path="FHIR/R4/Bundle"
+            data=json.dumps(bundle),
+            request_method="POST",
+            path="FHIR/R4/Bundle",
+            headers={"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
         )
         assert response.status_code == 400
 
@@ -886,7 +905,7 @@ class TestBundleEndpoint:
             ],
         }
 
-    def test_pdm_returns_400(
+    def test_pdm_returns_validation_error(
         self, client: Client, build_valid_test_result: Callable[[str, str], Bundle]
     ) -> None:
         bundle = build_valid_test_result("PDM_VALIDATION_ERROR", "ods_code")
@@ -908,15 +927,28 @@ class TestBundleEndpoint:
         response_data = response.json()
         operation_outcome = OperationOutcome.model_validate(response_data)
 
+        pdm_diagnostic = {
+            "resourceType": "OperationOutcome",
+            "issue": [
+                {
+                    "severity": "error",
+                    "code": "invariant",
+                    "details": {
+                        "text": "Bundle size exceeds maximum allowed size or"
+                        " number of entries."
+                    },
+                }
+            ],
+        }
         issue: OperationOutcome.Issue = {
-            "severity": "fatal",
-            "code": "exception",
-            "diagnostics": "Failed to create document",
+            "severity": "error",
+            "code": "invalid",
+            "diagnostics": f"Failed to store document: {json.dumps(pdm_diagnostic)}",
         }
 
         assert operation_outcome.issue == [issue]
 
-    def test_pdm_returns_500(
+    def test_pdm_returns_internal_server_error(
         self, client: Client, build_valid_test_result: Callable[[str, str], Bundle]
     ) -> None:
         bundle = build_valid_test_result("PDM_SERVER_ERROR", "ods_code")
@@ -938,10 +970,20 @@ class TestBundleEndpoint:
         response_data = response.json()
         operation_outcome = OperationOutcome.model_validate(response_data)
 
+        pdm_diagnostic = {
+            "resourceType": "OperationOutcome",
+            "issue": [
+                {
+                    "severity": "error",
+                    "code": "exception",
+                    "details": {"text": "Internal server error"},
+                }
+            ],
+        }
         issue: OperationOutcome.Issue = {
-            "severity": "fatal",
-            "code": "exception",
-            "diagnostics": "Failed to create document",
+            "severity": "error",
+            "code": "invalid",
+            "diagnostics": f"Failed to store document: {json.dumps(pdm_diagnostic)}",
         }
 
         assert operation_outcome.issue == [issue]
