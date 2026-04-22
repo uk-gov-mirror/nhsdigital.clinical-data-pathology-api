@@ -886,6 +886,66 @@ class TestBundleEndpoint:
             ],
         }
 
+    def test_pdm_returns_400(
+        self, client: Client, build_valid_test_result: Callable[[str, str], Bundle]
+    ) -> None:
+        bundle = build_valid_test_result("PDM_VALIDATION_ERROR", "ods_code")
+
+        response = client.send(
+            data=bundle.model_dump_json(by_alias=True),
+            path="FHIR/R4/Bundle",
+            request_method="POST",
+            headers={"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
+        )
+
+        assert response.status_code == 500
+        assert response.headers["Content-Type"] == "application/fhir+json"
+        assert (
+            response.headers["X-Correlation-ID"]
+            == "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"
+        )
+
+        response_data = response.json()
+        operation_outcome = OperationOutcome.model_validate(response_data)
+
+        issue: OperationOutcome.Issue = {
+            "severity": "fatal",
+            "code": "exception",
+            "diagnostics": "Failed to create document",
+        }
+
+        assert operation_outcome.issue == [issue]
+
+    def test_pdm_returns_500(
+        self, client: Client, build_valid_test_result: Callable[[str, str], Bundle]
+    ) -> None:
+        bundle = build_valid_test_result("PDM_SERVER_ERROR", "ods_code")
+
+        response = client.send(
+            data=bundle.model_dump_json(by_alias=True),
+            path="FHIR/R4/Bundle",
+            request_method="POST",
+            headers={"X-Correlation-ID": "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"},
+        )
+
+        assert response.status_code == 500
+        assert response.headers["Content-Type"] == "application/fhir+json"
+        assert (
+            response.headers["X-Correlation-ID"]
+            == "bb038f9a-dc45-49e1-bcfd-3ab3c3de5e16"
+        )
+
+        response_data = response.json()
+        operation_outcome = OperationOutcome.model_validate(response_data)
+
+        issue: OperationOutcome.Issue = {
+            "severity": "fatal",
+            "code": "exception",
+            "diagnostics": "Failed to create document",
+        }
+
+        assert operation_outcome.issue == [issue]
+
     @pytest.mark.parametrize(
         ("subject"),
         [
