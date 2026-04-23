@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 import requests
 
@@ -30,3 +30,26 @@ class PDMMockClient:
             cert=certs,
         )
         return response.json()
+
+
+class MNSMockClient:
+    def __init__(
+        self, url: str, timeout: timedelta, client_cert: CertificateDetails | None
+    ):
+        self._url = url
+        self._timeout = timeout
+        self._client_cert = client_cert
+
+    def retrieve_sent_messages(self, subject: str) -> list[Any]:
+        certs = (
+            (self._client_cert["cert_path"], self._client_cert["key_path"])
+            if self._client_cert
+            else None
+        )
+
+        response = requests.get(
+            self._url + subject,
+            timeout=self._timeout.total_seconds(),
+            cert=certs,
+        )
+        return cast("list[Any]", response.json().get("events", []))

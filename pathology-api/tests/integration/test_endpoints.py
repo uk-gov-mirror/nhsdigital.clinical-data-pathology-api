@@ -12,7 +12,7 @@ from pathology_api.fhir.r4.resources import (
 from pydantic import BaseModel, HttpUrl
 
 from tests.conftest import Client
-from tests.mock_client import PDMMockClient
+from tests.mock_client import MNSMockClient, PDMMockClient
 
 
 class TestBundleEndpoint:
@@ -21,8 +21,12 @@ class TestBundleEndpoint:
         client: Client,
         build_valid_test_result: Callable[[str, str], Bundle],
         pdm_mock_client: PDMMockClient,
+        mns_mock_client: MNSMockClient,
+        pdm_mock_url: str,
     ) -> None:
-        bundle = build_valid_test_result("nhs_number", "ods_code")
+        subject = "nhs_number"
+        requesting_ods_code = "ods_code"
+        bundle = build_valid_test_result(subject, requesting_ods_code)
 
         response = client.send(
             data=bundle.model_dump_json(by_alias=True),
@@ -59,6 +63,22 @@ class TestBundleEndpoint:
 
         sent_request = pdm_mock_client.retrieve_sent_request(response_bundle.id)
         assert sent_request == bundle.model_dump_json(by_alias=True)
+
+        published_events = mns_mock_client.retrieve_sent_messages(subject)
+        assert len(published_events) == 1
+
+        published_event = published_events[0]
+        assert published_event["subject"] == subject
+        assert published_event["dataref"] == pdm_mock_url + response_bundle.id
+        assert published_event["filtering"] == {
+            "requestingOrganisationODS": requesting_ods_code
+        }
+        assert (
+            published_event["type"]
+            == "pathology-laboratory-reporting-test-result-stored-1"
+        )
+        assert published_event["source"] == "uk.nhs.pathology-laboratory-reporting"
+        assert published_event["specversion"] == "1.0"
 
     def test_no_payload_returns_error(self, client: Client) -> None:
         response = client.send_without_payload(

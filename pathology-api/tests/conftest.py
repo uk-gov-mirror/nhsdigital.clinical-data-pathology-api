@@ -10,7 +10,7 @@ import pytest
 import requests
 from dotenv import load_dotenv
 
-from .mock_client import CertificateDetails, PDMMockClient
+from .mock_client import CertificateDetails, MNSMockClient, PDMMockClient
 
 load_dotenv()
 
@@ -260,26 +260,51 @@ def client(request: pytest.FixtureRequest, base_url: str) -> Client:
 def client_cert() -> Generator[CertificateDetails | None, None, None]:
     client_cert = _fetch_env_variable("CLIENT_CERT", str)
     client_key = _fetch_env_variable("CLIENT_KEY", str)
-    with (
-        tempfile.NamedTemporaryFile(delete=True) as cert_file,
-        tempfile.NamedTemporaryFile(delete=True) as key_file,
-    ):
-        cert_file.write(client_cert.encode())
-        cert_file.flush()
-        key_file.write(client_key.encode())
-        key_file.flush()
-        yield {
-            "cert_path": cert_file.name,
-            "key_path": key_file.name,
-        }
 
-    yield None
+    if client_cert and client_key:
+        with (
+            tempfile.NamedTemporaryFile(delete=True) as cert_file,
+            tempfile.NamedTemporaryFile(delete=True) as key_file,
+        ):
+            cert_file.write(client_cert.encode())
+            cert_file.flush()
+            key_file.write(client_key.encode())
+            key_file.flush()
+            yield {
+                "cert_path": cert_file.name,
+                "key_path": key_file.name,
+            }
+    else:
+        yield None
 
 
 @pytest.fixture(scope="module")
-def pdm_mock_client(client_cert: CertificateDetails | None) -> PDMMockClient:
+def pdm_mock_url() -> str:
+    return _fetch_env_variable("PDM_MOCK_URL", str)
+
+
+@pytest.fixture(scope="module")
+def mns_mock_url() -> str:
+    return _fetch_env_variable("MNS_MOCK_URL", str)
+
+
+@pytest.fixture(scope="module")
+def pdm_mock_client(
+    client_cert: CertificateDetails | None, pdm_mock_url: str
+) -> PDMMockClient:
     return PDMMockClient(
-        url=_fetch_env_variable("PDM_MOCK_URL", str),
+        url=pdm_mock_url,
+        timeout=timedelta(seconds=5),
+        client_cert=client_cert,
+    )
+
+
+@pytest.fixture(scope="module")
+def mns_mock_client(
+    client_cert: CertificateDetails | None, mns_mock_url: str
+) -> MNSMockClient:
+    return MNSMockClient(
+        url=mns_mock_url,
         timeout=timedelta(seconds=5),
         client_cert=client_cert,
     )
