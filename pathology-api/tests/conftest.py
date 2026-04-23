@@ -279,21 +279,21 @@ def client_cert() -> Generator[CertificateDetails | None, None, None]:
 
 
 @pytest.fixture(scope="module")
-def pdm_mock_url() -> str:
-    return _fetch_env_variable("PDM_MOCK_URL", str)
+def pdm_mock_document_url() -> str:
+    return _fetch_env_variable("PDM_MOCK_DOCUMENT_URL", str)
 
 
 @pytest.fixture(scope="module")
-def mns_mock_url() -> str:
-    return _fetch_env_variable("MNS_MOCK_URL", str)
+def mns_mock_events_url() -> str:
+    return _fetch_env_variable("MNS_MOCK_EVENTS_URL", str)
 
 
 @pytest.fixture(scope="module")
 def pdm_mock_client(
-    client_cert: CertificateDetails | None, pdm_mock_url: str
+    client_cert: CertificateDetails | None, pdm_mock_document_url: str
 ) -> PDMMockClient:
     return PDMMockClient(
-        url=pdm_mock_url,
+        document_url=pdm_mock_document_url,
         timeout=timedelta(seconds=5),
         client_cert=client_cert,
     )
@@ -301,10 +301,10 @@ def pdm_mock_client(
 
 @pytest.fixture(scope="module")
 def mns_mock_client(
-    client_cert: CertificateDetails | None, mns_mock_url: str
+    client_cert: CertificateDetails | None, mns_mock_events_url: str
 ) -> MNSMockClient:
     return MNSMockClient(
-        url=mns_mock_url,
+        events_url=mns_mock_events_url,
         timeout=timedelta(seconds=5),
         client_cert=client_cert,
     )

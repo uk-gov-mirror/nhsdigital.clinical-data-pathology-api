@@ -17,6 +17,22 @@ inputs:
     description: "Environment: local or remote"
     required: false
     default: "remote"
+  apim_client_key_secret_name:
+    description: "Secret name of the APIM client certificate key (if needed)"
+    required: false
+    default: ""
+  apim_client_cert_secret_name:
+    description: "Secret name of the APIM client certificate (if needed)"
+    required: false
+    default: ""
+  pdm_mock_document_url:
+    description: "PDM mock document URL (if needed)"
+    required: false
+    default: ""
+  mns_mock_events_url:
+    description: "MNS mock events URL (if needed)"
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -27,10 +43,25 @@ runs:
         APIGEE_ACCESS_TOKEN: ${{ inputs.apigee-access-token }}
         ENV: ${{ inputs.env }}
         TEST_TYPE: ${{ inputs.test-type }}
+        CLIENT_KEY_NAME: ${{ inputs.apim_client_key_secret_name }}
+        CLIENT_CERT_NAME: ${{ inputs.apim_client_cert_secret_name }}
+        PDM_MOCK_DOCUMENT_URL: ${{ inputs.pdm_mock_document_url }}
+        MNS_MOCK_EVENTS_URL: ${{ inputs.mns_mock_events_url }}
       run: |
         if [[ -n "${APIGEE_ACCESS_TOKEN}" ]]; then
           echo "::add-mask::${APIGEE_ACCESS_TOKEN}"
         fi
+
+        if [[ -n "${CLIENT_KEY_NAME}" ]]; then
+          echo "Using APIM client certificate key from name: ${CLIENT_KEY_NAME}"
+          export CLIENT_KEY=$(printf '%s' "$CLIENT_KEY_NAME")
+        fi
+
+        if [[ -n "${CLIENT_CERT_NAME}" ]]; then
+          echo "Using APIM client certificate from name: ${CLIENT_CERT_NAME}"
+          export CLIENT_CERT=$(printf '%s' "$CLIENT_CERT_NAME")
+        fi
+
         make test-${TEST_TYPE}
 
     - name: "Upload ${{ inputs.test-type }} test results"

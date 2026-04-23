@@ -11,9 +11,12 @@ class CertificateDetails(TypedDict):
 
 class PDMMockClient:
     def __init__(
-        self, url: str, timeout: timedelta, client_cert: CertificateDetails | None
+        self,
+        document_url: str,
+        timeout: timedelta,
+        client_cert: CertificateDetails | None,
     ):
-        self._url = url
+        self._document_url = document_url
         self._timeout = timeout
         self._client_cert = client_cert
 
@@ -25,7 +28,7 @@ class PDMMockClient:
         )
 
         response = requests.get(
-            self._url + request_id,
+            self._document_url + "/" + request_id,
             timeout=self._timeout.total_seconds(),
             cert=certs,
         )
@@ -34,9 +37,12 @@ class PDMMockClient:
 
 class MNSMockClient:
     def __init__(
-        self, url: str, timeout: timedelta, client_cert: CertificateDetails | None
+        self,
+        events_url: str,
+        timeout: timedelta,
+        client_cert: CertificateDetails | None,
     ):
-        self._url = url
+        self._events_url = events_url
         self._timeout = timeout
         self._client_cert = client_cert
 
@@ -48,7 +54,7 @@ class MNSMockClient:
         )
 
         response = requests.get(
-            self._url + subject,
+            self._events_url + "?subject=" + subject,
             timeout=self._timeout.total_seconds(),
             cert=certs,
         )
