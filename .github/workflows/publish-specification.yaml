@@ -1,0 +1,63 @@
+name: Publish the Specification
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      catalogue:
+        description: 'Catalogue'
+        required: true
+        default: "uat"
+        type: choice
+        options:
+        - "uat"
+        - "prod"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-west-2
+  PYTHON_VERSION: 3.14
+  PROXYGEN_KEY_ID: ${{ vars.PROD_PROXYGEN_KEY_ID }}
+  PROXYGEN_CLIENT_ID: ${{ vars.PROD_PROXYGEN_CLIENT_ID }}
+  PROXYGEN_API_NAME: ${{ vars.PROXYGEN_API_NAME }}
+
+jobs:
+  publish-spec:
+    name: "Publish specification"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Select AWS role inputs
+        id: role-select
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN_INT }}
+        run: echo "aws_role=$AWS_ROLE_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@5e19c1aa7acd2e02c5110eaf77eacd29039cca28
+        with:
+          role-to-assume: ${{ steps.role-select.outputs.aws_role }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get proxygen machine user details
+        id: proxygen-machine-user
+        uses: aws-actions/aws-secretsmanager-get-secrets@2cb1a461cbd4865ac4299648312e4704c646cd53
+        with:
+          secret-ids: /cds/pathology/int/proxygen/prod-proxygen-key-secret
+          name-transformation: lowercase
+
+      - name: Publish Specification
+        uses: ./.github/actions/proxy/publish-proxy
+        with:
+          proxygen-key-secret: ${{ env._cds_pathology_int_proxygen_prod_proxygen_key_secret }}
+          proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
+          proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
+          proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
+          catalogue: ${{ inputs.catalogue || 'prod' }}
