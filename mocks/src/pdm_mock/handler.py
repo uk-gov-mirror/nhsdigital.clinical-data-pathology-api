@@ -106,7 +106,7 @@ def _fetch_patient_from_payload(payload: dict[str, Any]) -> str | None:
     if not patient_values:
         return None
 
-    if len(patient_values) > 1:
+    if len(set(patient_values)) > 1:
         raise ValueError("Multiple patients referenced within the same bundle")
 
     return str(patient_values[0])
