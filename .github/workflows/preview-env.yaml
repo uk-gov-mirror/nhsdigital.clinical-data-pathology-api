@@ -37,6 +37,7 @@ jobs:
   pr-preview:
     name: "PR preview management"
     runs-on: ubuntu-latest
+    if: github.head_ref != 'main' && github.head_ref != 'integration'
     outputs:
       function_name: ${{ steps.names.outputs.function_name }}
       preview_url: ${{ steps.names.outputs.preview_url }}
@@ -841,7 +842,6 @@ jobs:
               issue_number: issueNumber,
               body: lines.join('\n'),
             });
-
       # ---------- Perform vuln scan and notify ----------
       # - name: Filesystem vuln scan
       # - name: SBOM generation
