@@ -41,7 +41,7 @@ jobs:
         run: echo "aws_role=$AWS_ROLE_ARN" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@5e19c1aa7acd2e02c5110eaf77eacd29039cca28
+        uses: aws-actions/configure-aws-credentials@bc9489585819302995bb108bbd899b7975f40303
         with:
           role-to-assume: ${{ steps.role-select.outputs.aws_role }}
           aws-region: ${{ env.AWS_REGION }}
