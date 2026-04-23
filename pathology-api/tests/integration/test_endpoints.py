@@ -12,11 +12,15 @@ from pathology_api.fhir.r4.resources import (
 from pydantic import BaseModel, HttpUrl
 
 from tests.conftest import Client
+from tests.mock_client import PDMMockClient
 
 
 class TestBundleEndpoint:
     def test_bundle_returns_200(
-        self, client: Client, build_valid_test_result: Callable[[str, str], Bundle]
+        self,
+        client: Client,
+        build_valid_test_result: Callable[[str, str], Bundle],
+        pdm_mock_client: PDMMockClient,
     ) -> None:
         bundle = build_valid_test_result("nhs_number", "ods_code")
 
@@ -52,6 +56,9 @@ class TestBundleEndpoint:
         assert response_meta.version_id == "1"
 
         assert response.headers["etag"] == 'W/"1"'
+
+        sent_request = pdm_mock_client.retrieve_sent_request(response_bundle.id)
+        assert sent_request == bundle.model_dump_json(by_alias=True)
 
     def test_no_payload_returns_error(self, client: Client) -> None:
         response = client.send_without_payload(

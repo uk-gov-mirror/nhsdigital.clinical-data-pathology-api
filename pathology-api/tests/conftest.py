@@ -1,12 +1,16 @@
 """Pytest configuration and shared fixtures for pathology API tests."""
 
 import os
+import tempfile
+from collections.abc import Generator
 from datetime import timedelta
 from typing import Any, Literal, Protocol, cast
 
 import pytest
 import requests
 from dotenv import load_dotenv
+
+from .mock_client import CertificateDetails, PDMMockClient
 
 load_dotenv()
 
@@ -250,6 +254,35 @@ def client(request: pytest.FixtureRequest, base_url: str) -> Client:
         return _create_remote_client(request)
     else:
         raise ValueError(f"Unknown env: {env}")
+
+
+@pytest.fixture(scope="module")
+def client_cert() -> Generator[CertificateDetails | None, None, None]:
+    client_cert = _fetch_env_variable("CLIENT_CERT", str)
+    client_key = _fetch_env_variable("CLIENT_KEY", str)
+    with (
+        tempfile.NamedTemporaryFile(delete=True) as cert_file,
+        tempfile.NamedTemporaryFile(delete=True) as key_file,
+    ):
+        cert_file.write(client_cert.encode())
+        cert_file.flush()
+        key_file.write(client_key.encode())
+        key_file.flush()
+        yield {
+            "cert_path": cert_file.name,
+            "key_path": key_file.name,
+        }
+
+    yield None
+
+
+@pytest.fixture(scope="module")
+def pdm_mock_client(client_cert: CertificateDetails | None) -> PDMMockClient:
+    return PDMMockClient(
+        url=_fetch_env_variable("PDM_MOCK_URL", str),
+        timeout=timedelta(seconds=5),
+        client_cert=client_cert,
+    )
 
 
 def _create_remote_client(request: pytest.FixtureRequest) -> RemoteClient:
