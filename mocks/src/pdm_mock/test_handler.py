@@ -193,6 +193,75 @@ class TestPDMMockHandler:
 
         assert not boto3_resource_mock.called
 
+    @patch("common.storage_helper.StorageHelper.put_item")
+    @patch("pdm_mock.handler.uuid4")
+    @patch("pdm_mock.handler.datetime")
+    @pytest.mark.parametrize(
+        ("payload_entry", "expected_status_code"),
+        [
+            pytest.param({"resource": {"resourceType": "Observation"}}, 201),
+            pytest.param(
+                {
+                    "resource": {
+                        "resourceType": "Composition",
+                        "subject": {"identifier": {"value": "test_number"}},
+                    }
+                },
+                201,
+            ),
+            pytest.param({"resource": {"resourceType": "Patient"}}, 201),
+            pytest.param(
+                {
+                    "resource": {
+                        "resourceType": "Patient",
+                        "identifier": [{"system": "https://fhir.nhs.uk/Id/nhs-number"}],
+                    }
+                },
+                201,
+            ),
+            pytest.param(
+                {
+                    "resource": {
+                        "resourceType": "Composition",
+                        "subject": {"identifier": {"value": "PDM_VALIDATION_ERROR"}},
+                    }
+                },
+                422,
+            ),
+            pytest.param(
+                {
+                    "resource": {
+                        "resourceType": "Patient",
+                        "identifier": [{"value": "PDM_SERVER_ERROR"}],
+                    }
+                },
+                500,
+            ),
+        ],
+    )
+    def test_magic_patient_id_in_payload(
+        self,
+        mock_datetime: MagicMock,
+        mock_uuid: MagicMock,
+        mock_storage_helper_put_item: MagicMock,
+        basic_document_payload: dict[str, Any],
+        payload_entry: dict[str, Any],
+        expected_status_code: int,
+        handler: ModuleType,
+    ) -> None:
+
+        mock_datetime.now.return_value = datetime.datetime(
+            2024, 6, 1, 0, 0, 0, tzinfo=datetime.timezone.utc
+        )
+        mock_uuid.return_value = "uuid4"
+        payload = {**basic_document_payload, "entry": [payload_entry]}
+
+        response = handler.handle_post_request(payload)
+
+        assert response["status_code"] == expected_status_code
+        if expected_status_code == 201:
+            assert mock_storage_helper_put_item.called
+
     @patch("boto3.resource")
     @patch("pdm_mock.handler.uuid4")
     @patch("pdm_mock.handler.datetime")
