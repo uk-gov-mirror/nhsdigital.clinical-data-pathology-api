@@ -1,16 +1,13 @@
 """Pytest configuration and shared fixtures for pathology API tests."""
 
 import os
-import tempfile
-from collections.abc import Generator
+from collections.abc import Callable
 from datetime import timedelta
-from typing import Any, Literal, Protocol, cast
+from typing import Any, Literal, Protocol
 
 import pytest
 import requests
 from dotenv import load_dotenv
-
-from .mock_client import CertificateDetails, MNSMockClient, PDMMockClient
 
 load_dotenv()
 
@@ -213,15 +210,32 @@ class RemoteClient:
 
 
 @pytest.fixture(scope="module")
-def base_url() -> str:
+def fetch_env_variable[T]() -> Callable[[str, type[T]], T]:
+    def _fetch_env_variable(name: str, required_type: type[T]) -> T:
+        value = os.getenv(name)
+        if not value:
+            raise ValueError(f"{name} environment variable is not set.")
+
+        if not isinstance(value, required_type):
+            raise ValueError(
+                f"{name} environment variable is not required type {required_type}"
+            )
+
+        return value
+
+    return _fetch_env_variable
+
+
+@pytest.fixture(scope="module")
+def base_url(fetch_env_variable: Callable[[str, type[str]], str]) -> str:
     """Retrieves the base URL of the currently deployed application."""
-    return _fetch_env_variable("BASE_URL", str)
+    return fetch_env_variable("BASE_URL", str)
 
 
 @pytest.fixture
-def hostname() -> str:
+def hostname(fetch_env_variable: Callable[[str, type[str]], str]) -> str:
     """Retrieves the hostname of the currently deployed application."""
-    return _fetch_env_variable("HOST", str)
+    return fetch_env_variable("HOST", str)
 
 
 @pytest.fixture
@@ -256,60 +270,6 @@ def client(request: pytest.FixtureRequest, base_url: str) -> Client:
         raise ValueError(f"Unknown env: {env}")
 
 
-@pytest.fixture(scope="module")
-def client_cert() -> Generator[CertificateDetails | None, None, None]:
-    client_cert = _fetch_env_variable("CLIENT_CERT", str)
-    client_key = _fetch_env_variable("CLIENT_KEY", str)
-
-    if client_cert and client_key:
-        with (
-            tempfile.NamedTemporaryFile(delete=True) as cert_file,
-            tempfile.NamedTemporaryFile(delete=True) as key_file,
-        ):
-            cert_file.write(client_cert.encode())
-            cert_file.flush()
-            key_file.write(client_key.encode())
-            key_file.flush()
-            yield {
-                "cert_path": cert_file.name,
-                "key_path": key_file.name,
-            }
-    else:
-        yield None
-
-
-@pytest.fixture(scope="module")
-def pdm_mock_document_url() -> str:
-    return _fetch_env_variable("PDM_MOCK_DOCUMENT_URL", str)
-
-
-@pytest.fixture(scope="module")
-def mns_mock_events_url() -> str:
-    return _fetch_env_variable("MNS_MOCK_EVENTS_URL", str)
-
-
-@pytest.fixture(scope="module")
-def pdm_mock_client(
-    client_cert: CertificateDetails | None, pdm_mock_document_url: str
-) -> PDMMockClient:
-    return PDMMockClient(
-        document_url=pdm_mock_document_url,
-        timeout=timedelta(seconds=5),
-        client_cert=client_cert,
-    )
-
-
-@pytest.fixture(scope="module")
-def mns_mock_client(
-    client_cert: CertificateDetails | None, mns_mock_events_url: str
-) -> MNSMockClient:
-    return MNSMockClient(
-        events_url=mns_mock_events_url,
-        timeout=timedelta(seconds=5),
-        client_cert=client_cert,
-    )
-
-
 def _create_remote_client(request: pytest.FixtureRequest) -> RemoteClient:
     """Create a RemoteClient with auth headers chosen by test markers.
 
@@ -336,13 +296,6 @@ def _create_remote_client(request: pytest.FixtureRequest) -> RemoteClient:
     return RemoteClient(
         api_url=proxy_url, auth_headers=auth_headers, timeout=timedelta(seconds=30)
     )
-
-
-def _fetch_env_variable[T](name: str, _: type[T]) -> T:
-    value = os.getenv(name)
-    if not value:
-        raise ValueError(f"{name} environment variable is not set.")
-    return cast("T", value)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
