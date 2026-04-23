@@ -54,12 +54,12 @@ runs:
 
         if [[ -n "${CLIENT_KEY_NAME}" ]]; then
           echo "Using APIM client certificate key from name: ${CLIENT_KEY_NAME}"
-          export CLIENT_KEY=$(printf '%s' "$CLIENT_KEY_NAME")
+          CLIENT_KEY=$(printf '%s' "$CLIENT_KEY_NAME")
         fi
 
         if [[ -n "${CLIENT_CERT_NAME}" ]]; then
           echo "Using APIM client certificate from name: ${CLIENT_CERT_NAME}"
-          export CLIENT_CERT=$(printf '%s' "$CLIENT_CERT_NAME")
+          CLIENT_CERT=$(printf '%s' "$CLIENT_CERT_NAME")
         fi
 
         make test-${TEST_TYPE}
