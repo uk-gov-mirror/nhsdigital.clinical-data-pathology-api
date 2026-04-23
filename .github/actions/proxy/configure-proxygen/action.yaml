@@ -14,6 +14,10 @@ inputs:
   proxygen-api-name:
     description: 'Proxygen API name'
     required: true
+  proxygen-environment:
+    description: 'Proxygen Environment'
+    required: false
+    default: 'ptl'
 
 runs:
   using: composite
@@ -33,14 +37,17 @@ runs:
         KEY_SECRET: "${{ inputs.proxygen-key-secret }}"
         KEY_ID: "${{ inputs.proxygen-key-id }}"
         CLIENT_ID: "${{ inputs.proxygen-client-id }}"
+        PROXYGEN_ENVIRONMENT: "${{ inputs.proxygen-environment }}"
       shell: bash
       working-directory: proxygen
       run: |
         cp settings.template.yaml $HOME/.proxygen/settings.yaml
         yq eval '.api = env(API_NAME)' -i $HOME/.proxygen/settings.yaml
+        yq eval '.endpoint_url = "https://proxygen." + strenv(PROXYGEN_ENVIRONMENT) + ".api.platform.nhs.uk"' -i $HOME/.proxygen/settings.yaml
 
         printf "%s" "$KEY_SECRET" > /tmp/proxygen_private_key.pem
         cp credentials.template.yaml $HOME/.proxygen/credentials.yaml
         yq eval '.private_key_path = "/tmp/proxygen_private_key.pem"' -i $HOME/.proxygen/credentials.yaml
         yq eval '.key_id = env(KEY_ID)' -i $HOME/.proxygen/credentials.yaml
         yq eval '.client_id = env(CLIENT_ID)' -i $HOME/.proxygen/credentials.yaml
+        yq eval '.base_url = "https://identity." + strenv(PROXYGEN_ENVIRONMENT) + ".api.platform.nhs.uk/realms/api-producers"' -i $HOME/.proxygen/credentials.yaml

@@ -23,8 +23,8 @@ inputs:
   proxygen-api-name:
     description: 'Proxygen API name'
     required: true
-  proxygen-environment:
-    description: 'Proxygen environment'
+  apim-environment:
+    description: 'APIM environment'
     required: true
   pr-number:
     description: 'Pull request number. When provided, appends "(PR-<number>)" to the API title in the proxy specification to distinguish PR-based proxies in the developer portal.'
@@ -62,7 +62,7 @@ runs:
 
     - name: Deploy API proxy
       env:
-        ENVIRONMENT: "${{ inputs.proxygen-environment }}"
+        ENVIRONMENT: "${{ inputs.apim-environment }}"
         BASE_PATH: "${{ inputs.proxy-base-path }}"
       shell: bash
       run: |

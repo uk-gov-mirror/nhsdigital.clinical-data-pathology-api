@@ -17,8 +17,8 @@ inputs:
   proxygen-api-name:
     description: 'Proxygen API name'
     required: true
-  proxygen-environment:
-    description: 'Proxygen environment'
+  apim-environment:
+    description: 'APIM environment'
     required: true
 
 runs:
@@ -34,7 +34,7 @@ runs:
 
     - name: Tear down preview API proxy
       env:
-        ENVIRONMENT: "${{ inputs.proxygen-environment }}"
+        ENVIRONMENT: "${{ inputs.apim-environment }}"
         BASE_PATH: "${{ inputs.proxy-base-path }}"
       shell: bash
       run: |
