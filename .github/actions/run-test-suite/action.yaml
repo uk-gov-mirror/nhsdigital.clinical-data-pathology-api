@@ -37,6 +37,20 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Fetch Client Key
+      if: ${{ inputs.apim_client_key_secret_name != '' }}
+      id: fetch-client-key
+      uses: aws-actions/aws-secretsmanager-get-secrets@2cb1a461cbd4865ac4299648312e4704c646cd53
+      with:
+        secret-ids: ${{ inputs.apim_client_key_secret_name }}
+        name-transformation: lowercase
+    - name: Fetch Client Certificate
+      if: ${{ inputs.apim_client_cert_secret_name != '' }}
+      id: fetch-client-cert
+      uses: aws-actions/aws-secretsmanager-get-secrets@2cb1a461cbd4865ac4299648312e4704c646cd53
+      with:
+        secret-ids: ${{ inputs.apim_client_cert_secret_name }}
+        name-transformation: lowercase
     - name: "Run ${{ inputs.test-type }} tests"
       shell: bash
       env:
@@ -53,13 +67,15 @@ runs:
         fi
 
         if [[ -n "${CLIENT_KEY_NAME}" ]]; then
-          echo "Using APIM client certificate key from name: ${CLIENT_KEY_NAME}"
-          CLIENT_KEY=$(printf '%s' "$CLIENT_KEY_NAME")
+          SECRET_NAME=${CLIENT_KEY_NAME//\//_}
+          echo "Using APIM client certificate key from name: ${SECRET_NAME}"
+          CLIENT_KEY=${!SECRET_NAME}
         fi
 
         if [[ -n "${CLIENT_CERT_NAME}" ]]; then
-          echo "Using APIM client certificate from name: ${CLIENT_CERT_NAME}"
-          CLIENT_CERT=$(printf '%s' "$CLIENT_CERT_NAME")
+          SECRET_NAME=${CLIENT_CERT_NAME//\//_}
+          echo "Using APIM client certificate from name: ${SECRET_NAME}"
+          CLIENT_CERT=${!SECRET_NAME}
         fi
 
         make test-${TEST_TYPE}
