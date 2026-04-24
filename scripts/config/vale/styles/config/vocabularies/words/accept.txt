@@ -8,6 +8,7 @@ cgroups
 coreutils
 customisability
 Cyber
+cybersecurity
 Dependabot
 [Dd]ev
 dotfiles
