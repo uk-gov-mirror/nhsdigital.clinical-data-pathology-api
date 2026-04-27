@@ -1,6 +1,7 @@
 """Integration tests for the pathology API using pytest."""
 
 import json
+import uuid
 from collections.abc import Callable
 from typing import Any, Literal
 
@@ -24,7 +25,7 @@ class TestBundleEndpoint:
         mns_mock_client: MNSMockClient,
         pdm_mock_document_url: str,
     ) -> None:
-        subject = "nhs_number"
+        subject = "subject-" + str(uuid.uuid4())
         requesting_ods_code = "ods_code"
         bundle = build_valid_test_result(subject, requesting_ods_code)
 
