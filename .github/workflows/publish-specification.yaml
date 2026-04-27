@@ -24,6 +24,7 @@ env:
   PROXYGEN_KEY_ID: ${{ vars.PROD_PROXYGEN_KEY_ID }}
   PROXYGEN_CLIENT_ID: ${{ vars.PROD_PROXYGEN_CLIENT_ID }}
   PROXYGEN_API_NAME: ${{ vars.PROXYGEN_API_NAME }}
+  PROXYGEN_ENV: "prod"
 
 jobs:
   publish-spec:
@@ -54,10 +55,11 @@ jobs:
           name-transformation: lowercase
 
       - name: Publish Specification
-        uses: ./.github/actions/proxy/publish-proxy
+        uses: ./.github/actions/proxy/publish-oas-spec
         with:
           proxygen-key-secret: ${{ env._cds_pathology_int_proxygen_prod_proxygen_key_secret }}
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
+          proxygen-environment: ${{ env.PROXYGEN_ENV }}
           catalogue: ${{ inputs.catalogue || 'prod' }}
