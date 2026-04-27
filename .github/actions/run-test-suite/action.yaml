@@ -54,12 +54,14 @@ runs:
 
         if [[ -n "${CLIENT_KEY_NAME}" ]]; then
           SECRET_NAME=${CLIENT_KEY_NAME//\//_}
+          SECRET_NAME=${SECRET_NAME//-/_}
           echo "Using APIM client certificate key from name: ${SECRET_NAME}"
           CLIENT_KEY=${!SECRET_NAME}
         fi
 
         if [[ -n "${CLIENT_CERT_NAME}" ]]; then
           SECRET_NAME=${CLIENT_CERT_NAME//\//_}
+          SECRET_NAME=${SECRET_NAME//-/_}
           echo "Using APIM client certificate from name: ${SECRET_NAME}"
           CLIENT_CERT=${!SECRET_NAME}
         fi
