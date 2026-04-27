@@ -1,11 +1,11 @@
 meta {
-  name: Test_Without_Organization
+  name: Test_Without_PractionerRole_IntEnvi
   type: http
-  seq: 9
+  seq: 38
 }
 
 post {
-  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pr-{{PR_NUMBER}}/FHIR/R4/Bundle
+  url: https://int.api.service.nhs.uk/pathology-laboratory-reporting/FHIR/R4/Bundle
   body: json
   auth: inherit
 }
@@ -49,12 +49,15 @@ body:json {
         }
       },
       {
-        "fullUrl": "practitionerrole",
+        "fullUrl": "organization",
         "resource": {
-          "resourceType": "PractitionerRole",
-          "organization": {
-            "reference": "organization"
-          }
+          "resourceType": "Organization",
+          "identifier": [
+            {
+              "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+              "value": "testOrg"
+            }
+          ]
         }
       }
     ]
@@ -63,7 +66,7 @@ body:json {
 
 assert {
   res.status: eq 400
-  res.body.issue[0].diagnostics: eq Document must include an Organization resource
+  res.body.issue[0].diagnostics: eq Document must include a PractitionerRole resource
 }
 
 settings {

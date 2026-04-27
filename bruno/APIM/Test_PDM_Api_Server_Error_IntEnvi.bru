@@ -1,11 +1,11 @@
 meta {
-  name: Test_Without_Organization
+  name: Test_PDM_Api_Server_Error_IntEnvi
   type: http
-  seq: 9
+  seq: 45
 }
 
 post {
-  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pr-{{PR_NUMBER}}/FHIR/R4/Bundle
+  url: https://int.api.service.nhs.uk/pathology-laboratory-reporting/FHIR/R4/Bundle
   body: json
   auth: inherit
 }
@@ -56,14 +56,38 @@ body:json {
             "reference": "organization"
           }
         }
+      },
+      {
+        "fullUrl": "patient",
+        "resource": {
+          "resourceType": "Patient",
+          "identifier": [
+            {
+              "system": "https://fhir.nhs.uk/Id/nhs-number",
+              "value": "PDM_SERVER_ERROR"
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "organization",
+        "resource": {
+          "resourceType": "Organization",
+          "identifier": [
+            {
+              "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+              "value": "testOrg"
+            }
+          ]
+        }
       }
     ]
   }
 }
 
 assert {
-  res.status: eq 400
-  res.body.issue[0].diagnostics: eq Document must include an Organization resource
+  res.status: eq 500
+  res.body.issue[0].diagnostics: contains Failed to send document:
 }
 
 settings {

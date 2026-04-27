@@ -1,11 +1,11 @@
 meta {
-  name: Test_Without_Organization
+  name: Test_Without_PractionerRole_Reference_IntEnvi
   type: http
-  seq: 9
+  seq: 51
 }
 
 post {
-  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pr-{{PR_NUMBER}}/FHIR/R4/Bundle
+  url: https://int.api.service.nhs.uk/pathology-laboratory-reporting/FHIR/R4/Bundle
   body: json
   auth: inherit
 }
@@ -53,8 +53,20 @@ body:json {
         "resource": {
           "resourceType": "PractitionerRole",
           "organization": {
-            "reference": "organization"
+            "reference": ""
           }
+        }
+      },
+      {
+        "fullUrl": "organization",
+        "resource": {
+          "resourceType": "Organization",
+          "identifier": [
+            {
+              "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+              "value": "testOrg"
+            }
+          ]
         }
       }
     ]
@@ -63,7 +75,7 @@ body:json {
 
 assert {
   res.status: eq 400
-  res.body.issue[0].diagnostics: eq Document must include an Organization resource
+  res.body.issue[0].diagnostics: eq "Organization resource not found with provided reference. Provided reference: "
 }
 
 settings {

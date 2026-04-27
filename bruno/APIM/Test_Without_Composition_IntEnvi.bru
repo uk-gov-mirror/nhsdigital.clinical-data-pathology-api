@@ -1,11 +1,11 @@
 meta {
-  name: Test_With_Incorrect_ReferenceType_in_Extension
+  name: Test_Without_Composition_IntEnvi
   type: http
-  seq: 21
+  seq: 40
 }
 
 post {
-  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pr-{{PR_NUMBER}}/FHIR/R4/Bundle
+  url: https://int.api.service.nhs.uk/pathology-laboratory-reporting/FHIR/R4/Bundle
   body: json
   auth: inherit
 }
@@ -19,26 +19,6 @@ body:json {
     "resourceType": "Bundle",
     "type": "document",
     "entry": [
-      {
-        "fullUrl": "composition",
-        "resource": {
-          "resourceType": "Composition",
-          "extension": [
-            {
-              "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
-              "valueReference": {
-                "reference": "servicerequest123"
-              }
-            }
-          ],
-          "subject": {
-            "identifier": {
-              "system": "https://fhir.nhs.uk/Id/nhs-number",
-              "value": "test-nhs-number"
-            }
-          }
-        }
-      },
       {
         "fullUrl": "servicerequest",
         "resource": {
@@ -75,7 +55,7 @@ body:json {
 
 assert {
   res.status: eq 400
-  res.body.issue[0].diagnostics: eq ServiceRequest resource not found with provided reference. Provided reference: servicerequest123
+  res.body.issue[0].diagnostics: eq Document must include a single Composition resource
 }
 
 settings {

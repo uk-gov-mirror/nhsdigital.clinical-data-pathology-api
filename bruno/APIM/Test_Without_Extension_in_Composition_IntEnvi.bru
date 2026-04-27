@@ -1,11 +1,11 @@
 meta {
-  name: Test_Without_Organization
+  name: Test_Without_Extension_in_Composition_IntEnvi
   type: http
-  seq: 9
+  seq: 41
 }
 
 post {
-  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pr-{{PR_NUMBER}}/FHIR/R4/Bundle
+  url: https://int.api.service.nhs.uk/pathology-laboratory-reporting/FHIR/R4/Bundle
   body: json
   auth: inherit
 }
@@ -23,14 +23,6 @@ body:json {
         "fullUrl": "composition",
         "resource": {
           "resourceType": "Composition",
-          "extension": [
-            {
-              "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
-              "valueReference": {
-                "reference": "servicerequest"
-              }
-            }
-          ],
           "subject": {
             "identifier": {
               "system": "https://fhir.nhs.uk/Id/nhs-number",
@@ -56,6 +48,18 @@ body:json {
             "reference": "organization"
           }
         }
+      },
+      {
+        "fullUrl": "organization",
+        "resource": {
+          "resourceType": "Organization",
+          "identifier": [
+            {
+              "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+              "value": "testOrg"
+            }
+          ]
+        }
       }
     ]
   }
@@ -63,7 +67,7 @@ body:json {
 
 assert {
   res.status: eq 400
-  res.body.issue[0].diagnostics: eq Document must include an Organization resource
+  res.body.issue[0].diagnostics: eq Composition does not define a valid basedOn-order-or-requisition extension
 }
 
 settings {
