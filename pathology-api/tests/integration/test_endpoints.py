@@ -62,7 +62,7 @@ class TestBundleEndpoint:
         assert response.headers["etag"] == 'W/"1"'
 
         sent_request = pdm_mock_client.retrieve_sent_request(response_bundle.id)
-        assert sent_request == bundle.model_dump(by_alias=True)
+        assert sent_request == bundle.model_dump(by_alias=True, exclude_none=True)
 
         published_events = mns_mock_client.retrieve_sent_messages(subject)
         assert len(published_events) == 1
