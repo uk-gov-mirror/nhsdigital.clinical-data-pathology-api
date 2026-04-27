@@ -114,7 +114,7 @@ def handle_post_request(payload: dict[str, Any]) -> PDMResponse:
     item: DocumentItem = {
         "sessionId": document_id,
         "expiresAt": int(time()) + DEFAULT_TTL,
-        "document": json.dumps(created_document),
+        "document": json.dumps(payload),
         "type": "pdm_document",
     }
 
