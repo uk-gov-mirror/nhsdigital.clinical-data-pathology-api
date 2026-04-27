@@ -23,8 +23,11 @@ inputs:
   proxygen-api-name:
     description: 'Proxygen API name'
     required: true
+  apim-environment:
+    description: 'APIM environment e.g. internal-dev'
+    required: true
   proxygen-environment:
-    description: 'Proxygen environment'
+    description: 'Proxygen Environment - prod or ptl'
     required: true
   pr-number:
     description: 'Pull request number. When provided, appends "(PR-<number>)" to the API title in the proxy specification to distinguish PR-based proxies in the developer portal.'
@@ -41,6 +44,7 @@ runs:
         proxygen-key-id: ${{ inputs.proxygen-key-id }}
         proxygen-client-id: ${{ inputs.proxygen-client-id }}
         proxygen-api-name: ${{ inputs.proxygen-api-name }}
+        proxygen-environment: ${{ inputs.proxygen-environment }}
 
     - name: Inject secrets into openapi.yaml for deploying proxy
       env:
@@ -62,7 +66,7 @@ runs:
 
     - name: Deploy API proxy
       env:
-        ENVIRONMENT: "${{ inputs.proxygen-environment }}"
+        ENVIRONMENT: "${{ inputs.apim-environment }}"
         BASE_PATH: "${{ inputs.proxy-base-path }}"
       shell: bash
       run: |

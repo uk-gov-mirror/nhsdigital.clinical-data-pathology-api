@@ -31,7 +31,8 @@ env:
   ENV: "remote"
   PR_NUMBER: ${{ github.event.pull_request.number }}
   HOST: "internal-dev.api.service.nhs.uk"
-  PROXY_ENV: "internal-dev"
+  APIM_ENV: "internal-dev"
+  PROXYGEN_ENV: "ptl"
 
 jobs:
   pr-preview:
@@ -594,7 +595,8 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
-          proxygen-environment: ${{ env.PROXY_ENV}}
+          apim-environment: ${{ env.APIM_ENV }}
+          proxygen-environment: ${{ env.PROXYGEN_ENV }}
           pr-number: ${{ github.event.pull_request.number }}
 
       - name: Deploy int preview API proxy
@@ -608,7 +610,8 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
-          proxygen-environment: ${{ env.PROXY_ENV}}
+          apim-environment: ${{ env.APIM_ENV }}
+          proxygen-environment: ${{ env.PROXYGEN_ENV }}
           pr-number: "${{ github.event.pull_request.number }}i"
 
       - name: Tear down preview API proxy
@@ -620,7 +623,8 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
-          proxygen-environment: ${{ env.PROXY_ENV}}
+          apim-environment: ${{ env.APIM_ENV }}
+          proxygen-environment: ${{ env.PROXYGEN_ENV }}
 
       - name: Tear down int preview API proxy
         if: github.event.action == 'closed' && github.event.pull_request.user.login != 'dependabot[bot]'
@@ -631,7 +635,8 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
-          proxygen-environment: ${{ env.PROXY_ENV}}
+          apim-environment: ${{ env.APIM_ENV }}
+          proxygen-environment: ${{ env.PROXYGEN_ENV }}
 
       - name: Retrieve Apigee Token
         id: apigee-token

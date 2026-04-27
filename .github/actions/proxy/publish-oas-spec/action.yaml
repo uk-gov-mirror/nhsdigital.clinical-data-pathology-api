@@ -14,6 +14,9 @@ inputs:
   proxygen-api-name:
     description: 'Proxygen API name'
     required: true
+  proxygen-environment:
+    description: 'Proxygen Environment - prod or ptl'
+    required: true
   catalogue:
     description: 'Catalogue to which the specification will be published'
     required: false
@@ -29,6 +32,7 @@ runs:
         proxygen-key-id: ${{ inputs.proxygen-key-id }}
         proxygen-client-id: ${{ inputs.proxygen-client-id }}
         proxygen-api-name: ${{ inputs.proxygen-api-name }}
+        proxygen-environment: ${{ inputs.proxygen-environment }}
 
     - name: Publish specification
       env:
