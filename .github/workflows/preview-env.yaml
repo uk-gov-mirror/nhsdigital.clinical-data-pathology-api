@@ -683,8 +683,8 @@ jobs:
         with:
           test-type: integration
           apigee-access-token: ${{ steps.apigee-token.outputs.apigee-access-token }}
-          apim_client_key_secret_name: "${{ env.API_MTLS_CERT || '/cds/pathology/dev/mtls/client1-key-public' }}"
-          apim_client_cert_secret_name: "${{ env.API_MTLS_KEY || '/cds/pathology/dev/mtls/client1-key-secret' }}"
+          apim_client_cert_secret_name: "${{ env.API_MTLS_CERT || '/cds/pathology/dev/mtls/client1-key-public' }}"
+          apim_client_key_secret_name: "${{ env.API_MTLS_KEY || '/cds/pathology/dev/mtls/client1-key-secret' }}"
           pdm_mock_document_url: ${{ steps.names.outputs.mock_preview_url }}/pdm/mock/Bundle
           mns_mock_events_url: ${{ steps.names.outputs.mock_preview_url }}/mns/mock/event
 
