@@ -1,13 +1,13 @@
 meta {
-  name: Test_Without_PractionerRole_IntEnvi
+  name: Test_Missing_Bearer_Token_IntEnvi
   type: http
-  seq: 34
+  seq: 62
 }
 
 post {
   url: https://int.api.service.nhs.uk/pathology-laboratory-reporting/FHIR/R4/Bundle
   body: json
-  auth: inherit
+  auth: none
 }
 
 headers {
@@ -49,6 +49,15 @@ body:json {
         }
       },
       {
+        "fullUrl": "practitionerrole",
+        "resource": {
+          "resourceType": "PractitionerRole",
+          "organization": {
+            "reference": "organization"
+          }
+        }
+      },
+      {
         "fullUrl": "organization",
         "resource": {
           "resourceType": "Organization",
@@ -65,8 +74,7 @@ body:json {
 }
 
 assert {
-  res.status: eq 400
-  res.body.issue[0].diagnostics: eq Document must include a PractitionerRole resource
+  res.status: eq 401
 }
 
 settings {

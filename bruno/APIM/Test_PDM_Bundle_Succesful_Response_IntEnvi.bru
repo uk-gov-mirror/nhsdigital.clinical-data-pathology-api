@@ -465,6 +465,11 @@ body:json {
 
 assert {
   res.status: eq 200
+  res.body.resourceType: eq "Bundle"
+  res.body.type: eq document
+  res.body.id: isNotEmpty
+  res.body.entry: isArray
+  res.body.entry[0].resource.subject.identifier.value: isNotEmpty
 }
 
 settings {

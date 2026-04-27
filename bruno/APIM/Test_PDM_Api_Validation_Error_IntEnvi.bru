@@ -1,7 +1,7 @@
 meta {
-  name: Test_Without_PractionerRole_IntEnvi
+  name: Test_PDM_Api_Validation_Error_IntEnvi
   type: http
-  seq: 34
+  seq: 68
 }
 
 post {
@@ -49,6 +49,27 @@ body:json {
         }
       },
       {
+        "fullUrl": "practitionerrole",
+        "resource": {
+          "resourceType": "PractitionerRole",
+          "organization": {
+            "reference": "organization"
+          }
+        }
+      },
+      {
+        "fullUrl": "patient",
+        "resource": {
+          "resourceType": "Patient",
+          "identifier": [
+            {
+              "system": "https://fhir.nhs.uk/Id/nhs-number",
+              "value": "PDM_VALIDATION_ERROR"
+            }
+          ]
+        }
+      },
+      {
         "fullUrl": "organization",
         "resource": {
           "resourceType": "Organization",
@@ -65,8 +86,8 @@ body:json {
 }
 
 assert {
-  res.status: eq 400
-  res.body.issue[0].diagnostics: eq Document must include a PractitionerRole resource
+  res.status: eq 500
+  res.body.issue[0].diagnostics: contains Failed to send document:
 }
 
 settings {
