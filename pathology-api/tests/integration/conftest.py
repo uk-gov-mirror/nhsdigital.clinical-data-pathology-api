@@ -42,6 +42,11 @@ def mns_mock_events_url(fetch_env_variable: Callable[[str, type[str]], str]) -> 
 
 
 @pytest.fixture(scope="module")
+def pdm_bundle_url(fetch_env_variable: Callable[[str, type[str]], str]) -> str:
+    return fetch_env_variable("PDM_BUNDLE_URL", str)
+
+
+@pytest.fixture(scope="module")
 def pdm_mock_client(
     client_cert: CertificateDetails | None, pdm_mock_document_url: str
 ) -> PDMMockClient:

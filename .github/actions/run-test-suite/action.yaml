@@ -33,6 +33,10 @@ inputs:
     description: "MNS mock events URL (if needed)"
     required: false
     default: ""
+  pdm_bundle_url:
+    description: "PDM bundle URL (if needed)"
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -47,6 +51,7 @@ runs:
         CLIENT_CERT_NAME: ${{ inputs.apim_client_cert_secret_name }}
         PDM_MOCK_DOCUMENT_URL: ${{ inputs.pdm_mock_document_url }}
         MNS_MOCK_EVENTS_URL: ${{ inputs.mns_mock_events_url }}
+        PDM_BUNDLE_URL: ${{ inputs.pdm_bundle_url }}
       run: |
         if [[ -n "${APIGEE_ACCESS_TOKEN}" ]]; then
           echo "::add-mask::${APIGEE_ACCESS_TOKEN}"

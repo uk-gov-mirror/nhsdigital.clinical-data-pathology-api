@@ -687,6 +687,7 @@ jobs:
           apim_client_key_secret_name: "${{ env.API_MTLS_KEY || '/cds/pathology/dev/mtls/client1-key-secret' }}"
           pdm_mock_document_url: ${{ steps.names.outputs.mock_preview_url }}/pdm/mock/Bundle
           mns_mock_events_url: ${{ steps.names.outputs.mock_preview_url }}/mns/mock/event
+          pdm_bundle_url: ${{ steps.names.outputs.int_preview_url }}/pdm/FHIR/R4/Bundle
 
       - name: "Run acceptance tests"
         if: github.event.action != 'closed'

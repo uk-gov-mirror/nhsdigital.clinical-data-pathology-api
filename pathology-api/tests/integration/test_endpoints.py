@@ -23,7 +23,7 @@ class TestBundleEndpoint:
         build_valid_test_result: Callable[[str, str], Bundle],
         pdm_mock_client: PDMMockClient,
         mns_mock_client: MNSMockClient,
-        pdm_mock_document_url: str,
+        pdm_bundle_url: str,
     ) -> None:
         subject = "subject-" + str(uuid.uuid4())
         requesting_ods_code = "ods_code"
@@ -70,7 +70,7 @@ class TestBundleEndpoint:
 
         published_event = published_events[0]
         assert published_event["subject"] == subject
-        assert published_event["dataref"] == pdm_mock_document_url + response_bundle.id
+        assert published_event["dataref"] == pdm_bundle_url + "/" + response_bundle.id
         assert published_event["filtering"] == {
             "requestingOrganisationODS": requesting_ods_code
         }
