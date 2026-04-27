@@ -66,7 +66,7 @@ runs:
           CLIENT_CERT=${!SECRET_NAME}
         fi
 
-        make test-${TEST_TYPE}
+        CLIENT_KEY=${CLIENT_KEY} CLIENT_CERT=${CLIENT_CERT} make test-${TEST_TYPE}
 
     - name: "Upload ${{ inputs.test-type }} test results"
       if: always()
