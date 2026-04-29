@@ -124,8 +124,8 @@ publish: # Publish the project artefact @Pipeline
 
 deploy: clean-docker build-images # Deploy the project artefact to the target environment @Pipeline
 	$(docker) network create $(dockerNetwork) || echo "Docker network '$(dockerNetwork)' already exists."
-	$(docker) run --platform linux/amd64 --name pathology-api -p 5001:8080 --network $(dockerNetwork) -d localhost/pathology-api-image
-	$(docker) run --platform linux/amd64 --name mocks -p 5003:8080 --network $(dockerNetwork) -d localhost/mocks-image
+	$(docker) run --platform linux/amd64 --name pathology-api -p 5001:8080 --env-file=".env.docker.api.local" --mount type=bind,src=$(AWS_DIR),dst=/root/.aws --network $(dockerNetwork) -d localhost/pathology-api-image
+	$(docker) run --platform linux/amd64 --name mocks -p 5003:8080 --env-file=".env.docker.mock.local" --mount type=bind,src=$(AWS_DIR),dst=/root/.aws --network $(dockerNetwork) -d localhost/mocks-image
 	$(docker) run --name pathology-api-gateway -p 5002:5000 -e TARGET_CONTAINER='PATHOLOGY_API' -e TARGET_URL='http://pathology-api:8080' --network $(dockerNetwork) -d localhost/api-gateway-mock-image
 	$(docker) run --name mocks-api-gateway -p 5005:5000 -e TARGET_CONTAINER='MOCKS' -e TARGET_URL='http://mocks:8080' --network $(dockerNetwork) -d localhost/api-gateway-mock-image
 

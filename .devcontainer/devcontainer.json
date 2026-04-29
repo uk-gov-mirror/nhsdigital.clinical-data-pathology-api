@@ -3,7 +3,8 @@
   "build": {
     "dockerfile": "../infrastructure/images/build-container/Dockerfile",
     "args": {
-      "INCLUDE_DEV_CERTS": "true"
+      "INCLUDE_DEV_CERTS": "true",
+      "AWS_DIR": "${localEnv:HOME}/.aws"
     }
   },
   "customizations": {
@@ -42,7 +43,8 @@
   "postCreateCommand": "doas apk add --no-cache openjdk21-jre && scripts/devcontainer/configure-zsh.sh && bash -c 'source ~/.bashrc && make config && pyenv activate pathology && make dependencies'",
   "mounts": [
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind,consistency=cached",
-    "source=${localEnv:HOME}/.proxygen,target=/home/pathology-dev/.proxygen,type=bind,consistency=cached"
+    "source=${localEnv:HOME}/.proxygen,target=/home/pathology-dev/.proxygen,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.aws,target=/home/pathology-dev/.aws,type=bind,consistency=cached"
   ],
   "remoteUser": "pathology-dev",
   "containerUser": "pathology-dev",

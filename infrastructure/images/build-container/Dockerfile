@@ -7,11 +7,12 @@ ENV EDITORCONFIG_DOWNLOAD_URL="https://github.com/editorconfig-checker/editorcon
 
 
 ARG INCLUDE_DEV_CERTS
-ARG DEV_CERT_FILENAME
+ARG AWS_DIR
 
 # Add development certificates to node if provided.
 ENV NODE_EXTRA_CA_CERTS=${INCLUDE_DEV_CERTS:+/etc/ssl/certs/ca-certificates.crt}
 ENV DEV_CERTS_INCLUDED=$INCLUDE_DEV_CERTS
+ENV AWS_DIR=$AWS_DIR
 
 ENV IN_BUILD_CONTAINER=true
 
@@ -55,6 +56,7 @@ fi \
         # Required for building lxml Python package
         libxml2-dev \
         libxslt-dev \
+        aws-cli \
 
     # Configure doas to allow members of the wheel group to run commands as root.
     && echo "permit :wheel" >> /etc/doas.conf \
@@ -156,6 +158,7 @@ RUN bash -c "source ~/.bashrc && pyenv virtualenv ${PYTHON_VERSION} pathology" \
 
     # Change default shell to bash for pathology-dev user.
     && chsh -s /bin/bash pathology-dev
+
 
 # Update pathology-dev user's bash configuration.
 COPY /resources/.bashrc /home/pathology-dev/.bashrc
