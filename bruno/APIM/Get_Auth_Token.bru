@@ -20,16 +20,10 @@ script:pre-request {
     const jwt = require("jsonwebtoken");
     const fs = require("node:fs");
     const crypto = require("node:crypto");
-<<<<<<< Updated upstream
-    const secret = bru.getEnvVar("JWT_SECRET");
-    const privateKeyPath = bru.getEnvVar("PRIVATE_KEY_PATH");
-=======
-
     const secret = bru.getEnvVar("JWT_SECRET");
     const privateKeyPath = bru.getEnvVar("PRIVATE_KEY_PATH");
 
->>>>>>> Stashed changes
-    if (!secret) {
+  if (!secret) {
       throw new Error("JWT_SECRET environment variable is missing.");
     }
 
@@ -38,10 +32,7 @@ script:pre-request {
     }
 
     const privateKey = fs.readFileSync(privateKeyPath);
-<<<<<<< Updated upstream
-=======
 
->>>>>>> Stashed changes
     const payload = {
       sub: secret,
       iss: secret,
@@ -49,7 +40,6 @@ script:pre-request {
       aud: audienceUrl,
       exp: (Date.now() / 1000) + 300
     };
-
     const options = {
       algorithm: 'RS512',
       header: { kid: kid }
@@ -61,11 +51,12 @@ script:pre-request {
     new_body.push({ name: "client_assertion", value: token });
 
     req.setBody(new_body);
-  }
+}
 
   const environment = bru.getGlobalEnvVar("APIM_ENV")
   generateAuthToken(bru, req, `https://${environment}.api.service.nhs.uk/oauth2/token`, bru.getEnvVar("KID"));
 }
+
 script:post-response {
   bru.setGlobalEnvVar("auth_token", res.getBody().access_token)
 }
