@@ -44,7 +44,7 @@ else:
 def forward_request(path_params):
     x_correlation_id = request.headers.get("X-Correlation-ID", "")
     forwarded_headers = {k.lower(): v for k, v in request.headers.items()}
-    forwarded_headers["nhsd-correlation-id"] = x_correlation_id
+    forwarded_headers["nhsd-correlation-id"] = f".{x_correlation_id}.test"
 
     response = requests.post(
         f"{TARGET_URL}/2015-03-31/functions/function/invocations",
@@ -61,8 +61,9 @@ def forward_request(path_params):
             },
             "httpMethod": request.method,
             "rawPath": f"/{path_params}",
-            "rawQueryString": "",
+            "rawQueryString": request.query_string.decode("utf-8"),
             "pathParameters": {"proxy": path_params},
+            "queryStringParameters": request.args.to_dict(),
         },
         headers={"Content-Type": "application/json"},
         timeout=120,
@@ -75,11 +76,13 @@ def forward_request(path_params):
     app.logger.info("response: %s", response.text)
     response_data = response.json()
 
+    headers = {"x-correlation-id": x_correlation_id} | response_data.get("headers", {})
+
     output = (
         (
             response_data["body"],
             response_data["statusCode"],
-            response_data["headers"],
+            headers,
         )
         if "body" in response_data
         else (response_data, 500, {"Content-Type": "text/plain"})
