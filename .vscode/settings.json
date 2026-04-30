@@ -78,5 +78,5 @@
   },
   // Disabling automatic port forwarding as the devcontainer should already have access to any required ports.
   "remote.autoForwardPorts": false,
-  "python-envs.defaultEnvManager": "ms-python.python:system"
+  "python-envs.defaultEnvManager": "ms-python.python:pyenv"
 }
