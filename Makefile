@@ -11,6 +11,7 @@ docker := docker
 endif
 
 dockerNetwork := pathology-local
+pythonPlatform := manylinux2014_$(shell uname -m)
 
 # ==============================================================================
 
@@ -58,7 +59,8 @@ build-pathology:
 	@echo "Packaging dependencies..."
 	@poetry build --format=wheel
 	VERSION=$$(poetry version -s)
-	@pip install "dist/pathology_api-$$VERSION-py3-none-any.whl" --target "./target/pathology-api" --platform manylinux2014_x86_64 --only-binary=:all:
+	@echo Building pathology API: version=$$VERSION, platform=${pythonPlatform}
+	@pip install "dist/pathology_api-$$VERSION-py3-none-any.whl" --target "./target/pathology-api" --platform ${pythonPlatform} --only-binary=:all:
 	# Copy lambda_handler file separately as it is not included within the package.
 	@cp lambda_handler.py ./target/pathology-api/
 	@cd ./target/pathology-api
@@ -84,7 +86,8 @@ build-mocks:
 	@echo "Packaging dependencies..."
 	@poetry build --format=wheel
 	VERSION=$$(poetry version -s)
-	@pip install "dist/pathology_api_mocks-$$VERSION-py3-none-any.whl" --target "./target/mocks" --platform manylinux2014_x86_64 --only-binary=:all:
+	@echo Building mocks: version=$$VERSION, platform=${pythonPlatform}
+	@pip install "dist/pathology_api_mocks-$$VERSION-py3-none-any.whl" --target "./target/mocks" --platform ${pythonPlatform} --only-binary=:all:
 	# Copy lambda_handler file separately as it is not included within the package.
 	@cp lambda_handler.py ./target/mocks/
 	@cd ./target/mocks
@@ -108,7 +111,7 @@ build-images: build # Build the project artefact @Pipeline
 	@cp -r mocks/target/mocks infrastructure/images/mocks/resources/build
 
 	@echo "Building Docker image using Docker. Utilising python version: ${PYTHON_VERSION} ..."
-	@$(docker) buildx build --load --platform=linux/amd64 --provenance=false --build-arg PYTHON_VERSION=${PYTHON_VERSION} -t localhost/pathology-api-image infrastructure/images/pathology-api
+	@$(docker) buildx build --load --provenance=false --build-arg PYTHON_VERSION=${PYTHON_VERSION} -t localhost/pathology-api-image infrastructure/images/pathology-api
 	@echo "Docker image 'pathology-api-image' built successfully!"
 
 	@echo "Building api gateway image using Docker. Utilising python version: ${PYTHON_VERSION} ..."
@@ -116,7 +119,7 @@ build-images: build # Build the project artefact @Pipeline
 	@echo "Docker image 'api-gateway-mock-image' built successfully!"
 
 	@echo "Building mocks Docker image using Docker. Utilising python version: ${PYTHON_VERSION} ..."
-	@$(docker) buildx build --load --platform=linux/amd64 --provenance=false --build-arg PYTHON_VERSION=${PYTHON_VERSION} -t localhost/mocks-image infrastructure/images/mocks
+	@$(docker) buildx build --load --provenance=false --build-arg PYTHON_VERSION=${PYTHON_VERSION} -t localhost/mocks-image infrastructure/images/mocks
 	@echo "Docker image 'mocks-image' built successfully!"
 
 publish: # Publish the project artefact @Pipeline
@@ -124,8 +127,8 @@ publish: # Publish the project artefact @Pipeline
 
 deploy: clean-docker build-images # Deploy the project artefact to the target environment @Pipeline
 	$(docker) network create $(dockerNetwork) || echo "Docker network '$(dockerNetwork)' already exists."
-	$(docker) run --platform linux/amd64 --name pathology-api -p 5001:8080 --env-file=".env.docker.api.local" --mount type=bind,src=$(AWS_DIR),dst=/root/.aws --network $(dockerNetwork) -d localhost/pathology-api-image
-	$(docker) run --platform linux/amd64 --name mocks -p 5003:8080 --env-file=".env.docker.mock.local" --mount type=bind,src=$(AWS_DIR),dst=/root/.aws --network $(dockerNetwork) -d localhost/mocks-image
+	$(docker) run --name pathology-api -p 5001:8080 --env-file=".env.docker.api.local" --mount type=bind,src=$(AWS_DIR),dst=/root/.aws --network $(dockerNetwork) -d localhost/pathology-api-image
+	$(docker) run --name mocks -p 5003:8080 --env-file=".env.docker.mock.local" --mount type=bind,src=$(AWS_DIR),dst=/root/.aws --network $(dockerNetwork) -d localhost/mocks-image
 	$(docker) run --name pathology-api-gateway -p 5002:5000 -e TARGET_CONTAINER='PATHOLOGY_API' -e TARGET_URL='http://pathology-api:8080' --network $(dockerNetwork) -d localhost/api-gateway-mock-image
 	$(docker) run --name mocks-api-gateway -p 5005:5000 -e TARGET_CONTAINER='MOCKS' -e TARGET_URL='http://mocks:8080' --network $(dockerNetwork) -d localhost/api-gateway-mock-image
 
