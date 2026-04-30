@@ -1,0 +1,474 @@
+meta {
+  name: Test_Expired_Bearer_Token_IntEnvi
+  type: http
+  seq: 63
+}
+
+post {
+  url: https://int.api.service.nhs.uk/pathology-laboratory-reporting/FHIR/R4/Bundle
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/fhir+json
+  Authorization: Bearer {{EXPIRED_BEARER_TOKEN}}
+}
+
+body:json {
+  {
+    "resourceType": "Bundle",
+    "identifier": {
+      "system": "https://tools.ietf.org/html/rfc4122",
+      "value": "1f859037-2942-4117-884a-f51b62db5a52"
+    },
+    "type": "document",
+    "timestamp": "2022-03-08T12:09:00+00:00",
+    "entry": [
+      {
+        "fullUrl": "urn:uuid:ce2073cd-7f19-4fd8-9956-f30ef7b4bd44",
+        "resource": {
+          "resourceType": "Composition",
+          "id": "ce2073cd-7f19-4fd8-9956-f30ef7b4bd44",
+          "extension": [
+            {
+              "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+              "valueReference": {
+                "reference": "urn:uuid:1c38d507-9ad7-4b49-ba91-7da204842cac"
+              }
+            },
+            {
+              "url": "http://hl7.eu/fhir/laboratory/StructureDefinition/composition-diagnosticReportReference",
+              "valueReference": {
+                "reference": "urn:uuid:35d46ca1-f253-4c97-b7ee-fb5fccdf6c20"
+              }
+            }
+          ],
+          "identifier": {
+            "system": "https://tools.ietf.org/html/rfc4122",
+            "value": "c3d5e6f7-8901-2345-6789-0abcdef12345"
+          },
+          "status": "final",
+          "type": {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "721981007",
+                "display": "Diagnostic studies report"
+              }
+            ]
+          },
+          "category": [
+            {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "394915009",
+                  "display": "General pathology (specialty)"
+                }
+              ]
+            }
+          ],
+          "subject": {
+            "reference": "urn:uuid:ab87a3f8-1d37-44a9-804e-5e962598a6e4",
+            "display": "WELSH, Joel",
+            "identifier": {
+              "system": "https://fhir.nhs.uk/Id/nhs-number",
+              "value": "9727710638"
+            }
+          },
+          "date": "2022-03-08T12:09:00+00:00",
+          "author": [
+            {
+              "reference": "urn:uuid:8a6d85b8-9837-4fed-a257-4cf207988338",
+              "display": "TD008362 PATH LAB 001"
+            }
+          ],
+          "title": "Laboratory Report",
+          "section": [
+            {
+              "title": "CRP (C reactive protein) mass concentration in serum",
+              "code": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "1106741000000105",
+                    "display": "CRP (C reactive protein) mass concentration in serum"
+                  }
+                ]
+              },
+              "entry": [
+                {
+                  "reference": "urn:uuid:8697e1ea-a15d-4cab-95d9-7335f4b57e22"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:8a6d85b8-9837-4fed-a257-4cf207988338",
+        "resource": {
+          "resourceType": "Organization",
+          "id": "8a6d85b8-9837-4fed-a257-4cf207988338",
+          "identifier": [
+            {
+              "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+              "value": "Y8J7D"
+            }
+          ],
+          "name": "TD008362 PATH LAB 001",
+          "address": [
+            {
+              "line": [
+                "PATHOLOGY LAB",
+                "7-8 WELLINGTON PLACE"
+              ],
+              "city": "LEEDS",
+              "district": "WEST YORKSHIRE",
+              "postalCode": "LS1 4AP"
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:3c43b5b3-06d6-445f-ae9a-48d5f05df434",
+        "resource": {
+          "resourceType": "Organization",
+          "id": "3c43b5b3-06d6-445f-ae9a-48d5f05df434",
+          "identifier": [
+            {
+              "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+              "value": "B82033"
+            }
+          ],
+          "name": "PICKERING MEDICAL PRACTICE",
+          "address": [
+            {
+              "line": [
+                "SOUTHGATE"
+              ],
+              "city": "PICKERING",
+              "district": "NORTH YORKSHIRE",
+              "postalCode": "YO18 8BL"
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:9a835acf-d715-4d84-8dcf-a8435f6417fe",
+        "resource": {
+          "resourceType": "Practitioner",
+          "id": "9a835acf-d715-4d84-8dcf-a8435f6417fe",
+          "identifier": [
+            {
+              "system": "https://fhir.hl7.org.uk/Id/gmc-number",
+              "value": "C1008215"
+            }
+          ],
+          "name": [
+            {
+              "use": "official",
+              "family": "GASKELL",
+              "given": [
+                "Gale"
+              ],
+              "prefix": [
+                "Dr"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:d4f5e6a1-2b3c-4d5e-9f6a-7b8c9d0e1f2a",
+        "resource": {
+          "resourceType": "PractitionerRole",
+          "id": "d4f5e6a1-2b3c-4d5e-9f6a-7b8c9d0e1f2a",
+          "practitioner": {
+            "reference": "urn:uuid:9a835acf-d715-4d84-8dcf-a8435f6417fe"
+          },
+          "organization": {
+            "reference": "urn:uuid:3c43b5b3-06d6-445f-ae9a-48d5f05df434",
+            "display": "PICKERING MEDICAL PRACTICE"
+          }
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:ab87a3f8-1d37-44a9-804e-5e962598a6e4",
+        "resource": {
+          "resourceType": "Patient",
+          "id": "ab87a3f8-1d37-44a9-804e-5e962598a6e4",
+          "identifier": [
+            {
+              "system": "https://fhir.nhs.uk/Id/nhs-number",
+              "value": "9727710638",
+              "use": "official"
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:1c38d507-9ad7-4b49-ba91-7da204842cac",
+        "resource": {
+          "resourceType": "ServiceRequest",
+          "id": "1c38d507-9ad7-4b49-ba91-7da204842cac",
+          "identifier": [
+            {
+              "system": "http://B82033-pickeringmedicalpractice.com/labrequest",
+              "value": "REQ-20220307-000142"
+            }
+          ],
+          "status": "active",
+          "intent": "order",
+          "code": {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "135842001",
+                "display": "Serum C reactive protein level"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "urn:uuid:ab87a3f8-1d37-44a9-804e-5e962598a6e4",
+            "display": "WELSH, Joel",
+            "identifier": {
+              "system": "https://fhir.nhs.uk/Id/nhs-number",
+              "value": "9727710638"
+            }
+          },
+          "authoredOn": "2022-01-29T10:24:00+00:00",
+          "requester": {
+            "reference": "urn:uuid:d4f5e6a1-2b3c-4d5e-9f6a-7b8c9d0e1f2a"
+          },
+          "performer": [
+            {
+              "reference": "urn:uuid:8a6d85b8-9837-4fed-a257-4cf207988338",
+              "display": "TD008362 PATH LAB 001"
+            }
+          ],
+          "specimen": [
+            {
+              "reference": "urn:uuid:bab0eaec-1ec5-4598-b660-90bb38a1030d"
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:35d46ca1-f253-4c97-b7ee-fb5fccdf6c20",
+        "resource": {
+          "resourceType": "DiagnosticReport",
+          "id": "35d46ca1-f253-4c97-b7ee-fb5fccdf6c20",
+          "identifier": [
+            {
+              "system": "http://Y8J7D-pathlab001.com/report",
+              "value": "REP-20220308-004205"
+            }
+          ],
+          "basedOn": [
+            {
+              "reference": "urn:uuid:1c38d507-9ad7-4b49-ba91-7da204842cac"
+            }
+          ],
+          "status": "final",
+          "category": [
+            {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v2-0074",
+                  "code": "LAB",
+                  "display": "Laboratory"
+                }
+              ]
+            }
+          ],
+          "code": {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "721981007",
+                "display": "Diagnostic studies report"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "urn:uuid:ab87a3f8-1d37-44a9-804e-5e962598a6e4",
+            "display": "WELSH, Joel",
+            "identifier": {
+              "system": "https://fhir.nhs.uk/Id/nhs-number",
+              "value": "9727710638"
+            }
+          },
+          "issued": "2022-03-08T12:09:00+00:00",
+          "performer": [
+            {
+              "reference": "urn:uuid:8a6d85b8-9837-4fed-a257-4cf207988338",
+              "display": "TD008362 PATH LAB 001"
+            }
+          ],
+          "specimen": [
+            {
+              "reference": "urn:uuid:bab0eaec-1ec5-4598-b660-90bb38a1030d"
+            }
+          ],
+          "result": [
+            {
+              "reference": "urn:uuid:8697e1ea-a15d-4cab-95d9-7335f4b57e22"
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:bab0eaec-1ec5-4598-b660-90bb38a1030d",
+        "resource": {
+          "resourceType": "Specimen",
+          "id": "bab0eaec-1ec5-4598-b660-90bb38a1030d",
+          "identifier": [
+            {
+              "system": "http://B82033-pickeringmedicalpractice.com/specimen",
+              "value": "SPC-REQ-20220307-000105"
+            }
+          ],
+          "accessionIdentifier": {
+            "system": "http://Y8J7D-pathlab001.com/specimen",
+            "value": "SPC-Lab-20220307-007856"
+          },
+          "status": "available",
+          "type": {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "122555007",
+                "display": "Venous blood specimen"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "urn:uuid:ab87a3f8-1d37-44a9-804e-5e962598a6e4",
+            "display": "WELSH, Joel",
+            "identifier": {
+              "system": "https://fhir.nhs.uk/Id/nhs-number",
+              "value": "9727710638"
+            }
+          },
+          "receivedTime": "2022-03-07T14:58:00+00:00",
+          "collection": {
+            "collectedDateTime": "2022-03-07T11:42:00+00:00"
+          }
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:8697e1ea-a15d-4cab-95d9-7335f4b57e22",
+        "resource": {
+          "resourceType": "Observation",
+          "id": "8697e1ea-a15d-4cab-95d9-7335f4b57e22",
+          "identifier": [
+            {
+              "system": "https://tools.ietf.org/html/rfc4122",
+              "value": "09fd65ba-4bbb-49dd-9d16-ca74f885db6c"
+            }
+          ],
+          "status": "final",
+          "category": [
+            {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                  "code": "laboratory",
+                  "display": "Laboratory"
+                }
+              ]
+            }
+          ],
+          "code": {
+            "coding": [
+              {
+                "extension": [
+                  {
+                    "url": "http://hl7.org/fhir/StructureDefinition/valueset-reference",
+                    "valueUri": "https://fhir.hl7.org.uk/ValueSet/UKCore-PathologyBoundedCodeListObservables"
+                  }
+                ],
+                "system": "http://snomed.info/sct",
+                "code": "1001371000000100",
+                "display": "Serum CRP (C reactive protein) level"
+              },
+              {
+                "extension": [
+                  {
+                    "url": "http://hl7.org/fhir/StructureDefinition/valueset-reference",
+                    "valueUri": "https://fhir.hl7.org.uk/ValueSet/UKCore-PathologyAndLaboratoryMedicineObservables"
+                  }
+                ],
+                "system": "http://snomed.info/sct",
+                "code": "1106741000000105",
+                "display": "CRP (C reactive protein) mass concentration in serum"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "urn:uuid:ab87a3f8-1d37-44a9-804e-5e962598a6e4",
+            "display": "WELSH, Joel",
+            "identifier": {
+              "system": "https://fhir.nhs.uk/Id/nhs-number",
+              "value": "9727710638"
+            }
+          },
+          "issued": "2022-03-08T12:09:00+00:00",
+          "performer": [
+            {
+              "reference": "urn:uuid:8a6d85b8-9837-4fed-a257-4cf207988338",
+              "display": "TD008362 PATH LAB 001"
+            }
+          ],
+          "valueQuantity": {
+            "value": 200,
+            "unit": "mg/L",
+            "system": "http://unitsofmeasure.org",
+            "code": "mg/L"
+          },
+          "interpretation": [
+            {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                  "code": "H",
+                  "display": "High"
+                }
+              ]
+            }
+          ],
+          "specimen": {
+            "reference": "urn:uuid:bab0eaec-1ec5-4598-b660-90bb38a1030d"
+          },
+          "referenceRange": [
+            {
+              "low": {
+                "value": 0,
+                "unit": "mg/L",
+                "system": "http://unitsofmeasure.org",
+                "code": "mg/L"
+              },
+              "high": {
+                "value": 5,
+                "unit": "mg/L",
+                "system": "http://unitsofmeasure.org",
+                "code": "mg/L"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
+
+assert {
+  res.status: eq 401
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

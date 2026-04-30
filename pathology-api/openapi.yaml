@@ -41,9 +41,7 @@ info:
     Using this API you can:
     - Send a laboratory test result
 
-    This API replaces the current [Pathology Messaging - EDIFACT API](https://digital.nhs.uk/developer/api-catalogue/pathology-messaging-edifact) and supersedes Laboratory HL7 V3 (see the [Message Implementation Manual](https://data.developer.nhs.uk/dms/mim/6.3.01/Index.htm)) under Domains -> Health and Clinical Management -> Laboratory).
-
-    The following pathology specialisms are currently supported by this API, with further specialism coverage under review:
+    This API replaces the current [Pathology Messaging - EDIFACT API](https://digital.nhs.uk/developer/api-catalogue/pathology-messaging-edifact) and provides support for the following pathology specialisms, with further specialism coverage under review:
     - clinical biochemistry (also known as chemical pathology), haematology, immunology, and transfusion medicine
     - microbiology - this includes bacteriology, virology, and serology
 

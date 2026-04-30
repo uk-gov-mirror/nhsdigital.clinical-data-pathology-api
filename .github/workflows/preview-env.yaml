@@ -31,12 +31,14 @@ env:
   ENV: "remote"
   PR_NUMBER: ${{ github.event.pull_request.number }}
   HOST: "internal-dev.api.service.nhs.uk"
-  PROXY_ENV: "internal-dev"
+  APIM_ENV: "internal-dev"
+  PROXYGEN_ENV: "ptl"
 
 jobs:
   pr-preview:
     name: "PR preview management"
     runs-on: ubuntu-latest
+    if: github.head_ref != 'main' && github.head_ref != 'integration'
     outputs:
       function_name: ${{ steps.names.outputs.function_name }}
       preview_url: ${{ steps.names.outputs.preview_url }}
@@ -79,7 +81,7 @@ jobs:
           fi
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@5e19c1aa7acd2e02c5110eaf77eacd29039cca28
+        uses: aws-actions/configure-aws-credentials@d4a9acd8d3a85678bd2eb9e0a2225949c8ce00f0
         with:
           role-to-assume: ${{ steps.role-select.outputs.aws_role }}
           aws-region: ${{ env.AWS_REGION }}
@@ -593,7 +595,9 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
-          proxygen-environment: ${{ env.PROXY_ENV}}
+          apim-environment: ${{ env.APIM_ENV }}
+          proxygen-environment: ${{ env.PROXYGEN_ENV }}
+          pr-number: ${{ github.event.pull_request.number }}
 
       - name: Deploy int preview API proxy
         if: github.event.action != 'closed' && github.event.pull_request.user.login != 'dependabot[bot]'
@@ -606,7 +610,9 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
-          proxygen-environment: ${{ env.PROXY_ENV}}
+          apim-environment: ${{ env.APIM_ENV }}
+          proxygen-environment: ${{ env.PROXYGEN_ENV }}
+          pr-number: "${{ github.event.pull_request.number }}i"
 
       - name: Tear down preview API proxy
         if: github.event.action == 'closed'
@@ -617,7 +623,8 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
-          proxygen-environment: ${{ env.PROXY_ENV}}
+          apim-environment: ${{ env.APIM_ENV }}
+          proxygen-environment: ${{ env.PROXYGEN_ENV }}
 
       - name: Tear down int preview API proxy
         if: github.event.action == 'closed' && github.event.pull_request.user.login != 'dependabot[bot]'
@@ -628,7 +635,8 @@ jobs:
           proxygen-key-id: ${{ env.PROXYGEN_KEY_ID }}
           proxygen-client-id: ${{ env.PROXYGEN_CLIENT_ID }}
           proxygen-api-name: ${{ env.PROXYGEN_API_NAME }}
-          proxygen-environment: ${{ env.PROXY_ENV}}
+          apim-environment: ${{ env.APIM_ENV }}
+          proxygen-environment: ${{ env.PROXYGEN_ENV }}
 
       - name: Retrieve Apigee Token
         id: apigee-token
@@ -714,14 +722,14 @@ jobs:
           mv coverage-merged.xml ${{ steps.create-name.outputs.artefact-name }}-mocks.xml
       - name: "Upload combined coverage report"
         if: always() && github.event.action != 'closed'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.create-name.outputs.artefact-name }}
           path: pathology-api/test-artefacts
           retention-days: 30
       - name: "Upload mocks coverage report"
         if: always() && github.event.action != 'closed'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.create-name.outputs.artefact-name }}-mocks
           path: mocks/test-artefacts
@@ -839,7 +847,6 @@ jobs:
               issue_number: issueNumber,
               body: lines.join('\n'),
             });
-
       # ---------- Perform vuln scan and notify ----------
       # - name: Filesystem vuln scan
       # - name: SBOM generation

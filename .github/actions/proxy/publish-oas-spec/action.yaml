@@ -1,0 +1,44 @@
+name: Publish API Proxy Specification
+description: Publish the Specification to the relevant catalogue
+
+inputs:
+  proxygen-key-secret:
+    description: 'Proxygen private key secret'
+    required: true
+  proxygen-key-id:
+    description: 'Proxygen key ID'
+    required: true
+  proxygen-client-id:
+    description: 'Proxygen client ID'
+    required: true
+  proxygen-api-name:
+    description: 'Proxygen API name'
+    required: true
+  proxygen-environment:
+    description: 'Proxygen Environment - prod or ptl'
+    required: true
+  catalogue:
+    description: 'Catalogue to which the specification will be published'
+    required: false
+    default: "uat"
+
+runs:
+  using: composite
+  steps:
+    - name: Configure Proxygen
+      uses: ./.github/actions/proxy/configure-proxygen
+      with:
+        proxygen-key-secret: ${{ inputs.proxygen-key-secret }}
+        proxygen-key-id: ${{ inputs.proxygen-key-id }}
+        proxygen-client-id: ${{ inputs.proxygen-client-id }}
+        proxygen-api-name: ${{ inputs.proxygen-api-name }}
+        proxygen-environment: ${{ inputs.proxygen-environment }}
+
+    - name: Publish specification
+      env:
+        CATALOGUE: ${{ inputs.catalogue }}
+      shell: bash
+      run: |
+        FLAGS="--no-confirm"
+        [[ "$CATALOGUE" != "prod" ]] && FLAGS="--uat $FLAGS"
+        proxygen spec publish pathology-api/openapi.yaml $FLAGS
