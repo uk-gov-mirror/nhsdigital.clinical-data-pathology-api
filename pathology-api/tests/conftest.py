@@ -59,7 +59,7 @@ class LocalClient:
         self,
         lambda_url: str,
         headers: dict[str, str] | None = None,
-        timeout: timedelta = timedelta(seconds=1),
+        timeout: timedelta = timedelta(seconds=10),
     ):
         self._lambda_url = lambda_url
         self._default_headers = {"Content-Type": "application/fhir+json"} | (

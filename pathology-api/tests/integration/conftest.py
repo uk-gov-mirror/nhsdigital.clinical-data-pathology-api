@@ -1,3 +1,4 @@
+import os
 import tempfile
 from collections.abc import Callable, Generator
 from datetime import timedelta
@@ -8,11 +9,9 @@ from tests.mock_client import CertificateDetails, MNSMockClient, PDMMockClient
 
 
 @pytest.fixture(scope="module")
-def client_cert(
-    fetch_env_variable: Callable[[str, type[str]], str],
-) -> Generator[CertificateDetails | None, None, None]:
-    client_cert = fetch_env_variable("CLIENT_CERT", str)
-    client_key = fetch_env_variable("CLIENT_KEY", str)
+def client_cert() -> Generator[CertificateDetails | None, None, None]:
+    client_cert = os.getenv("CLIENT_CERT")
+    client_key = os.getenv("CLIENT_KEY")
 
     if client_cert and client_key:
         with (

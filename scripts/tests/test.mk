@@ -138,8 +138,9 @@ env-remote:
 
 # Run tests against local lambda
 test-local: env-local
+	@echo "Running test stage: $${stage:-all}"
 	@set -a && source .env && set +a && \
-		$(MAKE) test
+		$(MAKE) test$(if $(stage),-$(stage),)
 
 # Run tests against remote lambda, exporting APIGEE_ACCESS_TOKEN only
 test-remote: env-remote
