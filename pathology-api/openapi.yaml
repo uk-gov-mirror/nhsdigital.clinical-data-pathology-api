@@ -232,10 +232,10 @@ paths:
                         identifier:
                           system: "https://fhir.nhs.uk/Id/nhs-number"
                           value: "9999999999"
-                        extension:
-                          - url: "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition"
-                            valueReference:
-                              reference: "ServiceRequest"
+                      extension:
+                        - url: "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition"
+                          valueReference:
+                            reference: "ServiceRequest"
                   - fullUrl: "ServiceRequest"
                     resource:
                       resourceType: ServiceRequest
@@ -250,8 +250,8 @@ paths:
                     resource:
                       resourceType: Organization
                       identifier:
-                        system: "https://fhir.nhs.uk/Id/ods-organization-code"
-                        value: "A12345"
+                        - system: "https://fhir.nhs.uk/Id/ods-organization-code"
+                          value: "A12345"
                   - fullUrl: "Patient"
                     resource:
                       resourceType: Patient
@@ -365,8 +365,8 @@ paths:
                         resource:
                           resourceType: Organization
                           identifier:
-                            system: "https://fhir.nhs.uk/Id/ods-organization-code"
-                            value: "A12345"
+                            - system: "https://fhir.nhs.uk/Id/ods-organization-code"
+                              value: "A12345"
                       - fullUrl: "Patient"
                         resource:
                           resourceType: Patient
@@ -565,20 +565,23 @@ components:
             - Organization
           example: Organization
         identifier:
-          type: object
-          required:
-            - system
-            - value
-          properties:
-            system:
-              type: string
-              enum:
-                - "https://fhir.nhs.uk/Id/ods-organization-code"
-              example: "https://fhir.nhs.uk/Id/ods-organization-code"
-            value:
-              type: string
-              example: "A12345"
-              description: ODS code of the requesting organisation
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - system
+              - value
+            properties:
+              system:
+                type: string
+                enum:
+                  - "https://fhir.nhs.uk/Id/ods-organization-code"
+                example: "https://fhir.nhs.uk/Id/ods-organization-code"
+              value:
+                type: string
+                example: "A12345"
+                description: ODS code of the requesting organisation
     OperationOutcome:
       type: object
       required:
