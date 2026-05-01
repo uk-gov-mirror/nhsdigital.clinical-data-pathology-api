@@ -148,6 +148,8 @@ test-remote: env-remote
 	@echo "Obtaining APIGEE access token..."
 	@set -a && source .env && set +a && \
 		APIGEE_ACCESS_TOKEN="$$(./scripts/get_apigee_token.sh)" && \
+		CLIENT_CERT="$$(./scripts/fetch_secret.sh "$$APIM_CLIENT_CERT_SECRET_NAME")" && \
+		CLIENT_KEY="$$(./scripts/fetch_secret.sh "$$APIM_CLIENT_KEY_SECRET_NAME")" && \
 		BASE_URL="$${BASE_URL}-pr-$${PR_NUMBER}" && \
-		export APIGEE_ACCESS_TOKEN BASE_URL && \
+		export APIGEE_ACCESS_TOKEN CLIENT_CERT CLIENT_KEY BASE_URL && \
 		$(MAKE) test$(if $(stage),-$(stage),)
