@@ -51,6 +51,14 @@ class Client(Protocol):
         """
         ...
 
+    @property
+    def auth_headers(self) -> dict[str, str] | None:
+        """
+        Return the authentication headers used by this client, or None if not
+        applicable.
+        """
+        ...
+
 
 class LocalClient:
     """HTTP client that sends requests to the Lambda via the RIE (no auth headers)."""
@@ -97,6 +105,10 @@ class LocalClient:
             request_method=request_method,
             headers=headers,
         )
+
+    @property
+    def auth_headers(self) -> None:
+        return None
 
     def _send(
         self,
@@ -181,6 +193,10 @@ class RemoteClient:
             request_method=request_method,
             headers=headers,
         )
+
+    @property
+    def auth_headers(self) -> dict[str, str]:
+        return self._default_headers
 
     def _send(
         self,

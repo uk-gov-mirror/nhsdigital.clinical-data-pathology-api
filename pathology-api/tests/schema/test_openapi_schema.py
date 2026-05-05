@@ -7,8 +7,11 @@ from the OpenAPI specification and validate the API implementation.
 from pathlib import Path
 
 import yaml
+from hypothesis import HealthCheck, settings
 from schemathesis.generation.case import Case
 from schemathesis.openapi import from_dict
+
+from tests.conftest import Client
 
 # Load the OpenAPI schema from the local file
 schema_path = Path(__file__).parent.parent.parent / "openapi.yaml"
@@ -18,7 +21,10 @@ schema = from_dict(schema_dict)
 
 
 @schema.parametrize()
-def test_api_schema_compliance(case: Case, base_url: str) -> None:
+# Allowing client even though function scoped. Same auth can be safely
+# used for all schema testing.
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+def test_api_schema_compliance(case: Case, base_url: str, client: Client) -> None:
     """Test API endpoints against the OpenAPI schema.
 
     Schemathesis automatically generates test cases with:
@@ -34,4 +40,4 @@ def test_api_schema_compliance(case: Case, base_url: str) -> None:
     - Returns appropriate status codes
     """
     # Call the API and validate the response against the schema
-    case.call_and_validate(base_url=base_url, timeout=30)
+    case.call_and_validate(base_url=base_url, timeout=30, headers=client.auth_headers)

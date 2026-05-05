@@ -1,4 +1,7 @@
 request-timeout = 20.0
 
+[checks]
+positive_data_acceptance.expected-statuses = [200]
+
 [generation]
 mode = "positive"
