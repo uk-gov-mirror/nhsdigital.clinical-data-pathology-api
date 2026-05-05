@@ -56,7 +56,6 @@ fi \
         # Required for building lxml Python package
         libxml2-dev \
         libxslt-dev \
-        aws-cli \
 
     # Configure doas to allow members of the wheel group to run commands as root.
     && echo "permit :wheel" >> /etc/doas.conf \

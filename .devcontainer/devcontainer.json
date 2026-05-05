@@ -39,8 +39,8 @@
       "omzPlugins": "https://github.com/zsh-users/zsh-autosuggestions.git https://github.com/zsh-users/zsh-syntax-highlighting.git"
     }
   },
-  "initializeCommand": "scripts/devcontainer/create-docker-network-if-required.sh && cp .tool-versions ${localWorkspaceFolder}/infrastructure/images/build-container/resources/.tool-versions && mkdir -p ${localEnv:HOME}/.proxygen",
-  "postCreateCommand": "doas apk add --no-cache openjdk21-jre && scripts/devcontainer/configure-zsh.sh && bash -c 'source ~/.bashrc && make config && pyenv activate pathology && make dependencies'",
+  "initializeCommand": "scripts/devcontainer/create-docker-network-if-required.sh && cp .tool-versions ${localWorkspaceFolder}/infrastructure/images/build-container/resources/.tool-versions && mkdir -p ${localEnv:HOME}/.proxygen && mkdir -p ${localEnv:HOME}/.aws",
+  "postCreateCommand": "doas apk add --no-cache openjdk21-jre aws-cli && scripts/devcontainer/configure-zsh.sh && bash -c 'source ~/.bashrc && make config && pyenv activate pathology && make dependencies'",
   "mounts": [
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.proxygen,target=/home/pathology-dev/.proxygen,type=bind,consistency=cached",

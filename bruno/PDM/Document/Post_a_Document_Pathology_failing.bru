@@ -1,17 +1,17 @@
 meta {
-  name: Post Document Bundle via APIM - INT
+  name: Post_a_Document_Pathology_failing
   type: http
-  seq: 4
+  seq: 5
 }
 
 post {
-  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pri-{{PR_NUMBER}}/FHIR/R4/Bundle
+  url: https://{{APIM_ENV}}.api.service.nhs.uk/patient-data-manager/FHIR/R4/Bundle
   body: json
   auth: inherit
 }
 
 headers {
-  Content-Type: application/fhir+json
+  X-Request-ID: e317708a-741e-45f7-be6c-b8b4ff86cbb9
 }
 
 body:json {

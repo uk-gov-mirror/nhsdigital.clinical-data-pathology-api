@@ -8,12 +8,10 @@ import pytest
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
-os.environ["TOKEN_TABLE_NAME"] = "token_table"  # noqa: S105
-os.environ["MNS_TABLE_NAME"] = "test_table"
+os.environ["MOCK_TABLE_NAME"] = "test_table"
 os.environ["DDB_INDEX_TAG"] = "test_branch"
-os.environ["AUTH_URL"] = "auth_url"
-os.environ["PUBLIC_KEY_URL"] = "public_key_url"
-os.environ["API_KEY"] = "api_key"
+# os.environ["PUBLIC_KEY_URL"] = "public_key_url"
+# os.environ["API_KEY_SECRET_NAME"] = "test_secret"  # noqa: S105
 
 with patch("boto3.resource"):
     from apim_mock.auth_check import AuthenticationError

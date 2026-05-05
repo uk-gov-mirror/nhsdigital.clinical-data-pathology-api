@@ -1,7 +1,7 @@
 meta {
   name: Get Auth Token
   type: http
-  seq: 1
+  seq: 2
 }
 
 post {
@@ -57,6 +57,7 @@ script:pre-request {
   const environment = bru.getGlobalEnvVar("APIM_ENV")
   generateAuthToken(bru, req, `https://${environment}.api.service.nhs.uk/oauth2/token`, bru.getEnvVar("KID"));
 }
+
 script:post-response {
   bru.setGlobalEnvVar("auth_token", res.getBody().access_token)
 }

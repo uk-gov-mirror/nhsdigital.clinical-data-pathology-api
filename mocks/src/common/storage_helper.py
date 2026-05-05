@@ -4,6 +4,8 @@ from typing import NotRequired, TypedDict, cast
 import boto3
 from boto3.dynamodb.conditions import Attr, ConditionBase, Key
 
+DEFAULT_TTL = 600
+
 
 class BaseMockItem(TypedDict):
     sessionId: str

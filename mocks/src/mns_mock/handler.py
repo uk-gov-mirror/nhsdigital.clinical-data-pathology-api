@@ -1,5 +1,4 @@
 import json
-import os
 from collections.abc import Callable
 from time import time
 from typing import Any, TypedDict, cast
@@ -9,15 +8,16 @@ from apim_mock.auth_check import check_authenticated
 from aws_lambda_powertools.event_handler import Response
 from aws_lambda_powertools.event_handler.router import APIGatewayHttpRouter
 from boto3.dynamodb.conditions import Attr
+from common import environment
 from common.logging import get_logger
-from common.storage_helper import BaseMockItem, StorageHelper
+from common.storage_helper import DEFAULT_TTL, BaseMockItem, StorageHelper
 
-MNS_TABLE_NAME = os.environ["MNS_TABLE_NAME"]
-BRANCH_NAME = os.environ["DDB_INDEX_TAG"]
+TOKEN_TABLE_NAME = environment.values()["mock_table_name"]
+BRANCH_NAME = environment.values()["ddb_index_tag"]
 
 # Constructor for APIGatewayHttpRouter leads to untyped code.
 mns_routes = APIGatewayHttpRouter()  # type: ignore
-storage_helper = StorageHelper(MNS_TABLE_NAME, BRANCH_NAME)
+storage_helper = StorageHelper(TOKEN_TABLE_NAME, BRANCH_NAME)
 
 _logger = get_logger(__name__)
 
@@ -79,7 +79,7 @@ def handle_post_request(payload: dict[str, Any]) -> MNSResponse:
     event_id = str(uuid4())
     event_item: EventItem = {
         "sessionId": event_id,
-        "expiresAt": int(time()) + 600,
+        "expiresAt": int(time()) + DEFAULT_TTL,
         "type": "mns_event",
         "event": payload,
         "subject": payload["subject"],

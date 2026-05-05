@@ -151,7 +151,6 @@ jobs:
           cd pathology-api/target/
           FN="${{ steps.names.outputs.function_name }}"
           EXPIRY_THRESHOLD="${TOKEN_EXPIRY_THRESHOLD:-30s}"
-          JWKS_SECRET="${JWKS_SECRET_NAME:-/cds/pathology/dev/jwks/secret}"
           PRIVATE_KEY="${APIM_PRIVATE_KEY:-/cds/pathology/dev/apim/private-key}"
           API_KEY="${APIM_APIKEY:-/cds/pathology/dev/apim/api-key}"
           MTLS_CERT="${API_MTLS_CERT:-/cds/pathology/dev/mtls/client1-key-public}"
@@ -330,19 +329,12 @@ jobs:
           echo "url      = ${{ steps.names.outputs.int_preview_url }}"
 
       # ---------- Handle mock endpoints ----------
-      - name: Get Secrets for mocks
-        uses: aws-actions/aws-secretsmanager-get-secrets@2cb1a461cbd4865ac4299648312e4704c646cd53
-        with:
-          secret-ids: |
-            /cds/pathology/dev/jwks/secret
-          name-transformation: lowercase
-
       - name: Create or update mock Lambda (on open/sync/reopen)
         if: github.event.action != 'closed'
         env:
           TOKEN_EXPIRY_TIME: ${{ secrets.TOKEN_LIFETIME }}
           AUTH_URL: "${{ steps.names.outputs.mock_preview_url }}/apim/oauth2/token"
-          JWKS_SECRET: ${{ env._cds_pathology_dev_jwks_secret }}
+          JWKS_SECRET_NAME: ${{ secrets.JWKS_SECRET_NAME }}
           PUBLIC_KEY_URL: "https://pki.dev.endpoints.pathology-laboratory-reporting.national.nhs.uk/pathology.jwks"
           DYNAMODB_TABLE_NAME: "mock_services_dev"
         run: |
@@ -374,7 +366,7 @@ jobs:
                                         TOKEN_LIFETIME=$TOKEN_LIFETIME, \
                                         AUTH_URL=$AUTH_URL, \
                                         PUBLIC_KEY_URL=$PUBLIC_KEY_URL, \
-                                        API_KEY=$JWKS_SECRET, \
+                                        API_KEY_SECRET_NAME="${JWKS_SECRET_NAME:-/cds/pathology/dev/jwks/secret}", \
                                         TOKEN_TABLE_NAME=$DYNAMODB_TABLE_NAME, \
                                         PDM_TABLE_NAME=$DYNAMODB_TABLE_NAME, \
                                         MNS_TABLE_NAME=$DYNAMODB_TABLE_NAME \
@@ -392,7 +384,7 @@ jobs:
                                         TOKEN_LIFETIME=$TOKEN_LIFETIME, \
                                         AUTH_URL=$AUTH_URL, \
                                         PUBLIC_KEY_URL=$PUBLIC_KEY_URL, \
-                                        API_KEY=$JWKS_SECRET, \
+                                        API_KEY_SECRET_NAME="${JWKS_SECRET_NAME:-/cds/pathology/dev/jwks/secret}", \
                                         TOKEN_TABLE_NAME=$DYNAMODB_TABLE_NAME, \
                                         PDM_TABLE_NAME=$DYNAMODB_TABLE_NAME, \
                                         MNS_TABLE_NAME=$DYNAMODB_TABLE_NAME \

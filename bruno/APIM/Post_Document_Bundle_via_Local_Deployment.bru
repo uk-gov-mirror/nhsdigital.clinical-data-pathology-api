@@ -1,17 +1,18 @@
 meta {
-  name: Post Document Bundle via APIM - INT
+  name: Post Document Bundle via Local Deployment
   type: http
-  seq: 4
+  seq: 5
 }
 
 post {
-  url: https://{{APIM_ENV}}.api.service.nhs.uk/pathology-laboratory-reporting-pri-{{PR_NUMBER}}/FHIR/R4/Bundle
+  url: http://localhost:5002/FHIR/R4/Bundle
   body: json
-  auth: inherit
+  auth: none
 }
 
 headers {
   Content-Type: application/fhir+json
+  X-Correlation-ID: c0ccbce4-d41f-4f6a-9958-c32b48fe46e2
 }
 
 body:json {

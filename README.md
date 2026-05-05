@@ -59,6 +59,24 @@ Once the build container has been built and is up and running, A few different `
 - `deploy` - builds the codebase and deploys it within a separate container locally.
 - `clean` - stops and removes any containers outside of the Dev container locally.
 
+### AWS Credentials
+
+The local deployment containers make use of AWS resources which require you to be authenticated with AWS to be accessed.
+
+For first time set up you should run `aws configure sso`.
+The session name can be anything e.g. `dev-session`.
+The URL is the same one we use to select an account to log into AWS console or you can use the one provided under access keys on that same portal.
+The region should be set to eu-west-2.
+You can leave the registration scopes as default `sso:account:access`.
+It will then open a browser link which you will have to log onto and accept the permissions request.
+
+It will then asks you which account to use, select the one you would like to use.
+Set the default region for the profile to eu-west-2.
+Leave the profile name as default as this will need to match the automatic one set by the make command.
+
+After you have setup a session you can login using that session again by running the command `aws sso login --profile AWS-CDSPath-DEV_DevAccess-859065147940`
+or `aws sso login --ssp-session [session-name]`
+
 ### Testing
 
 There are `make` tasks for you to configure to run your tests.  Run `make test` to see how they work.  You should be able to use the same entry points for local development as in your CI pipeline.

@@ -1,5 +1,4 @@
 import json
-import os
 from collections.abc import Callable
 from datetime import datetime, timezone
 from time import time
@@ -9,12 +8,13 @@ from uuid import uuid4
 from apim_mock.auth_check import check_authenticated
 from aws_lambda_powertools.event_handler import Response
 from aws_lambda_powertools.event_handler.router import APIGatewayHttpRouter
+from common import environment
 from common.logging import get_logger
-from common.storage_helper import BaseMockItem, StorageHelper
+from common.storage_helper import DEFAULT_TTL, BaseMockItem, StorageHelper
 from common.utils import check_valid_uuid4
 
-PDM_TABLE_NAME = os.environ["PDM_TABLE_NAME"]
-BRANCH_NAME = os.environ["DDB_INDEX_TAG"]
+PDM_TABLE_NAME = environment.values()["mock_table_name"]
+BRANCH_NAME = environment.values()["ddb_index_tag"]
 
 
 # Constructor for APIGatewayHttpRouter leads to untyped code.
@@ -113,7 +113,7 @@ def handle_post_request(payload: dict[str, Any]) -> PDMResponse:
     }
     item: DocumentItem = {
         "sessionId": document_id,
-        "expiresAt": int(time()) + 600,
+        "expiresAt": int(time()) + DEFAULT_TTL,
         "document": json.dumps(created_document),
         "type": "pdm_document",
     }

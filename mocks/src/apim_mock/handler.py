@@ -1,5 +1,4 @@
 import json
-import os
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
@@ -12,6 +11,8 @@ from aws_lambda_powertools.event_handler import (
     Response,
 )
 from aws_lambda_powertools.event_handler.router import APIGatewayHttpRouter
+from aws_lambda_powertools.utilities import parameters
+from common import environment
 from common.logging import get_logger
 from common.storage_helper import BaseMockItem, StorageHelper
 from common.utils import check_valid_uuid4
@@ -21,11 +22,8 @@ JWT_ALGORITHMS = ["RS512"]
 REQUESTS_TIMEOUT = 5
 DEFAULT_TOKEN_LIFETIME = 599
 
-AUTH_URL = os.environ["AUTH_URL"]
-PUBLIC_KEY_URL = os.environ["PUBLIC_KEY_URL"]
-API_KEY = os.environ["API_KEY"]
-TOKEN_TABLE_NAME = os.environ["TOKEN_TABLE_NAME"]
-BRANCH_NAME = os.environ["DDB_INDEX_TAG"]
+TOKEN_TABLE_NAME = environment.values()["mock_table_name"]
+BRANCH_NAME = environment.values()["ddb_index_tag"]
 
 # Constructor for APIGatewayHttpRouter leads to untyped code.
 apim_routes = APIGatewayHttpRouter()  # type: ignore
@@ -52,7 +50,7 @@ def handle_request(payload: dict[str, Any]) -> dict[str, Any]:
     assertions = jwt.decode(
         client_assertion,
         public_key,
-        audience=AUTH_URL,
+        audience=environment.values()["auth_url"],
         algorithms=JWT_ALGORITHMS,
     )
 
@@ -117,7 +115,9 @@ def _get_jwt_headers(client_assertion: str) -> dict[str, Any]:
 def _get_jwk_keys_from_public_url() -> Any:
     _logger.debug("Retrieving keys from url")
 
-    response = requests.get(PUBLIC_KEY_URL, timeout=REQUESTS_TIMEOUT)
+    response = requests.get(
+        environment.values()["public_key_url"], timeout=REQUESTS_TIMEOUT
+    )
     response.raise_for_status()
 
     response_body = response.json()
@@ -144,12 +144,14 @@ def _get_jwk_key_by_kid(kid: str) -> Any:
 
 
 def _validate_assertions(assertions: dict[str, Any]) -> None:
+    api_key = parameters.get_secret(environment.values()["api_key_secret_name"])
+
     if not assertions.get("iss") or not assertions.get("sub"):
         raise ValueError(
             "Missing or non-matching 'iss'/'sub' claims in client_assertion JWT"
         )
 
-    if assertions.get("iss") != API_KEY or assertions.get("sub") != API_KEY:
+    if assertions.get("iss") != api_key or assertions.get("sub") != api_key:
         raise ValueError("Invalid 'iss'/'sub' claims in client_assertion JWT")
 
     jti = assertions.get("jti", "")

@@ -1,12 +1,12 @@
-import os
 from typing import Any
 
 from boto3.dynamodb.conditions import Attr
+from common import environment
 from common.logging import get_logger
 from common.storage_helper import StorageHelper
 
-TOKEN_TABLE_NAME = os.environ["TOKEN_TABLE_NAME"]
-BRANCH_NAME = os.environ["DDB_INDEX_TAG"]
+TOKEN_TABLE_NAME = environment.values()["mock_table_name"]
+BRANCH_NAME = environment.values()["ddb_index_tag"]
 
 storage_helper = StorageHelper(TOKEN_TABLE_NAME, BRANCH_NAME)
 _logger = get_logger(__name__)

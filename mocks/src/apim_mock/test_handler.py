@@ -17,9 +17,9 @@ from requests import HTTPError
 os.environ["AUTH_URL"] = "auth_url"
 os.environ["PUBLIC_KEY_URL"] = "public_key_url"
 os.environ["API_KEY"] = "api_key"
-os.environ["TOKEN_TABLE_NAME"] = "token_table"  # noqa: S105 - Dummy value
-os.environ["DDB_INDEX_TAG"] = "branch_name"
-
+os.environ["MOCK_TABLE_NAME"] = "token_table"
+os.environ["DDB_INDEX_TAG"] = "test_branch"
+os.environ["API_KEY_SECRET_NAME"] = "test_secret"  # noqa: S105 - Dummy value
 
 CLIENT_ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 
@@ -74,8 +74,10 @@ class TestHandleRequest:
     @patch("apim_mock.handler._generate_random_token")
     @patch("apim_mock.handler.datetime")
     @patch("requests.get")
+    @patch("aws_lambda_powertools.utilities.parameters.get_secret")
     def test_handle_request(
         self,
+        get_secret_mock: MagicMock,
         requests_mock: MagicMock,
         datetime_mock: MagicMock,
         generate_random_token_mock: MagicMock,
@@ -121,6 +123,8 @@ class TestHandleRequest:
 
         generate_random_token_mock.return_value = "test_token"
 
+        get_secret_mock.return_value = "api_key"
+
         payload = {
             "grant_type": "client_credentials",
             "client_assertion_type": [
@@ -141,7 +145,7 @@ class TestHandleRequest:
             Item={
                 "access_token": "test_token",
                 "expiresAt": 1772212839,
-                "ddb_index": "branch_name",
+                "ddb_index": "test_branch",
                 "sessionId": "test_token",
                 "type": "access_token",
             }
@@ -338,8 +342,10 @@ class TestHandleRequest:
     @patch("jwt.decode")
     @patch("jwt.get_unverified_header")
     @patch("requests.get")
+    @patch("aws_lambda_powertools.utilities.parameters.get_secret")
     def test_validate_assertions(
         self,
+        get_secret_mock: MagicMock,
         requests_mock: MagicMock,
         jwt_get_unverified_header_mock: MagicMock,
         jwt_decode_mock: MagicMock,
@@ -374,6 +380,8 @@ class TestHandleRequest:
         }
         jwt_decode_mock.return_value = assertions
 
+        get_secret_mock.return_value = "api_key"
+
         with pytest.raises(ValueError, match=error_message):
             handler.handle_request(payload)
 
@@ -382,8 +390,10 @@ class TestHandleRequest:
     @patch("jwt.algorithms.RSAAlgorithm.from_jwk")
     @patch("apim_mock.handler.datetime")
     @patch("requests.get")
+    @patch("aws_lambda_powertools.utilities.parameters.get_secret")
     def test_generate_random_token(
         self,
+        get_secret_mock: MagicMock,
         requests_mock: MagicMock,
         datetime_mock: MagicMock,
         rsaa_jwt_from_jwk_mock: MagicMock,
@@ -391,6 +401,7 @@ class TestHandleRequest:
         jwt_decode_mock: MagicMock,
         handler: ModuleType,
     ) -> None:
+        get_secret_mock.return_value = "api_key"
 
         jwt_get_unverified_header_mock.return_value = {
             "alg": "RS512",
@@ -453,8 +464,10 @@ class TestHandleRequest:
     @patch("apim_mock.handler._generate_random_token")
     @patch("jwt.algorithms.RSAAlgorithm.from_jwk")
     @patch("requests.get")
+    @patch("aws_lambda_powertools.utilities.parameters.get_secret")
     def test_get_access_token_success(
         self,
+        get_secret_mock: MagicMock,
         requests_get_mock: MagicMock,
         rsaa_jwt_from_jwk_mock: MagicMock,
         generate_random_token_mock: MagicMock,
@@ -462,6 +475,8 @@ class TestHandleRequest:
         jwt_decode_mock: MagicMock,
         lambda_app: APIGatewayHttpResolver,
     ) -> None:
+        get_secret_mock.return_value = "api_key"
+
         jwt_get_unverified_header_mock.return_value = {
             "alg": "RS512",
             "kid": "DEV-1",

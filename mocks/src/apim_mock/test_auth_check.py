@@ -4,12 +4,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-os.environ["TOKEN_TABLE_NAME"] = "token_table"  # noqa: S105 - Dummy value
-os.environ["DDB_INDEX_TAG"] = "branch_name"
-os.environ["AUTH_URL"] = "auth_url"
-os.environ["PUBLIC_KEY_URL"] = "public_key"
-os.environ["BRANCH_NAME"] = "branch_name"
-os.environ["API_KEY"] = "api_key"
+os.environ["MOCK_TABLE_NAME"] = "token_table"  # noqa: S105 - Dummy value
+os.environ["BRANCH_NAME"] = "test_branch"
 
 
 class TestAuthCheck:
