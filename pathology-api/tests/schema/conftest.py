@@ -7,6 +7,7 @@ _SERVICE_REQUEST_EXTENSION_URL = (
     "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition"
 )
 _ODS_CODE_SYSTEM_URL = "https://fhir.nhs.uk/Id/ods-organization-code"
+_NHS_NUMBER_SYSTEM_URL = "https://fhir.nhs.uk/Id/nhs-number"
 
 
 def _find_entries(body: dict[str, Any]) -> list[dict[str, Any]]:
@@ -88,7 +89,7 @@ def ensure_composition_in_body(
                 "resourceType": "Composition",
                 "subject": {
                     "identifier": {
-                        "system": "https://fhir.nhs.uk/Id/nhs-number",
+                        "system": _NHS_NUMBER_SYSTEM_URL,
                         "value": "nhs_number",
                     }
                 },
@@ -120,7 +121,7 @@ def ensure_service_request_in_body(
                 "resourceType": "ServiceRequest",
                 "subject": {
                     "identifier": {
-                        "system": "https://fhir.nhs.uk/Id/nhs-number",
+                        "system": _NHS_NUMBER_SYSTEM_URL,
                         "value": "nhs_number",
                     }
                 },
@@ -304,6 +305,72 @@ def ensure_valid_references_in_body(
         _ensure_organization_references(entries)
         _ensure_practitioner_role_references(entries)
         _ensure_service_request_references(entries)
+
+        case.body["entry"] = entries
+
+    return case
+
+
+@schemathesis.hook("before_call")
+def ensure_organization_has_valid_identifier(
+    _ctx: schemathesis.HookContext, case: schemathesis.Case, **_kwargs: Any
+) -> schemathesis.Case:
+    """
+    Hook to ensure that when schemathesis generates a request body,
+    any Organization resource included contains an identifier with the correct system.
+    """
+
+    def __is_missing_identifier(item: dict[str, Any]) -> bool:
+
+        ods_identifiers = [
+            identifier
+            for identifier in item["resource"].get("identifier", [])
+            if identifier.get("system") == _ODS_CODE_SYSTEM_URL
+            and identifier.get("value")
+        ]
+        return len(ods_identifiers) == 0
+
+    if isinstance(case.body, dict):
+        entries = _find_entries(case.body)
+        for organization in filter(
+            __is_missing_identifier, _find_resources(entries, "Organization")
+        ):
+            identifiers = organization["resource"].setdefault("identifier", [])
+            identifiers.append(
+                {
+                    "system": _ODS_CODE_SYSTEM_URL,
+                    "value": "ods_code",
+                }
+            )
+
+        case.body["entry"] = entries
+
+    return case
+
+
+@schemathesis.hook("before_call")
+def ensure_composition_includes_subject_identifier(
+    _ctx: schemathesis.HookContext, case: schemathesis.Case, **_kwargs: Any
+) -> schemathesis.Case:
+    """
+    Hook to ensure that when schemathesis generates a request body,
+    any Composition resource included contains a subject with an identifier.
+    """
+
+    def __is_missing_subject_identifier(item: dict[str, Any]) -> bool:
+        identifier = item["resource"]["subject"]["identifier"]
+        return not identifier.get("value")
+
+    if isinstance(case.body, dict):
+        entries = _find_entries(case.body)
+        for composition in filter(
+            __is_missing_subject_identifier,
+            _find_resources(entries, "Composition"),
+        ):
+            composition["resource"]["subject"]["identifier"] = {
+                "system": _NHS_NUMBER_SYSTEM_URL,
+                "value": "nhs_number",
+            }
 
         case.body["entry"] = entries
 
