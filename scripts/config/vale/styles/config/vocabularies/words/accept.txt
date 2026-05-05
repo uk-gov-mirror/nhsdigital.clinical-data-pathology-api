@@ -11,6 +11,7 @@ Cyber
 cybersecurity
 Dependabot
 [Dd]ev
+[Dd]ocstring([s]?)
 dotfiles
 Gitleaks
 Grype
@@ -18,7 +19,9 @@ hostname
 Hotspots
 IDE
 idempotence
+[Ii]sort
 JUnit
+markdownlint
 namespaces
 OAuth
 Octokit
