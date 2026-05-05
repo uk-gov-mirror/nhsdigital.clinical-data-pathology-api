@@ -1,0 +1,78 @@
+meta {
+  name: Test_Without_Organization_Identifier_IntEnvi
+  type: http
+  seq: 8
+}
+
+post {
+  url: https://int.api.service.nhs.uk/pathology-laboratory-reporting/FHIR/R4/Bundle
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/fhir+json
+}
+
+body:json {
+  {
+    "resourceType": "Bundle",
+    "type": "document",
+    "entry": [
+      {
+        "fullUrl": "composition",
+        "resource": {
+          "resourceType": "Composition",
+          "extension": [
+            {
+              "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+              "valueReference": {
+                "reference": "servicerequest"
+              }
+            }
+          ],
+          "subject": {
+            "identifier": {
+              "system": "https://fhir.nhs.uk/Id/nhs-number",
+              "value": "test-nhs-number"
+            }
+          }
+        }
+      },
+      {
+        "fullUrl": "servicerequest",
+        "resource": {
+          "resourceType": "ServiceRequest",
+          "requester": {
+            "reference": "practitionerrole"
+          }
+        }
+      },
+      {
+        "fullUrl": "practitionerrole",
+        "resource": {
+          "resourceType": "PractitionerRole",
+          "organization": {
+            "reference": "organization"
+          }
+        }
+      },
+      {
+        "fullUrl": "organization",
+        "resource": {
+          "resourceType": "Organization"
+        }
+      }
+    ]
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.issue[0].diagnostics: eq Organisation (organization) does not define a valid subject identifier
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

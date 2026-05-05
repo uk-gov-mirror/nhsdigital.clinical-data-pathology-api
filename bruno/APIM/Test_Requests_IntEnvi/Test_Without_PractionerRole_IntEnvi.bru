@@ -1,0 +1,75 @@
+meta {
+  name: Test_Without_PractionerRole_IntEnvi
+  type: http
+  seq: 7
+}
+
+post {
+  url: https://int.api.service.nhs.uk/pathology-laboratory-reporting/FHIR/R4/Bundle
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/fhir+json
+}
+
+body:json {
+  {
+    "resourceType": "Bundle",
+    "type": "document",
+    "entry": [
+      {
+        "fullUrl": "composition",
+        "resource": {
+          "resourceType": "Composition",
+          "extension": [
+            {
+              "url": "http://hl7.eu/fhir/StructureDefinition/composition-basedOn-order-or-requisition",
+              "valueReference": {
+                "reference": "servicerequest"
+              }
+            }
+          ],
+          "subject": {
+            "identifier": {
+              "system": "https://fhir.nhs.uk/Id/nhs-number",
+              "value": "test-nhs-number"
+            }
+          }
+        }
+      },
+      {
+        "fullUrl": "servicerequest",
+        "resource": {
+          "resourceType": "ServiceRequest",
+          "requester": {
+            "reference": "practitionerrole"
+          }
+        }
+      },
+      {
+        "fullUrl": "organization",
+        "resource": {
+          "resourceType": "Organization",
+          "identifier": [
+            {
+              "system": "https://fhir.nhs.uk/Id/ods-organization-code",
+              "value": "testOrg"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.issue[0].diagnostics: eq Document must include a PractitionerRole resource
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
