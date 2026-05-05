@@ -263,10 +263,49 @@ class TestHandleRequest:
             bundle_id=result_bundle.id,
         )
 
+    def test_handle_request_with_empty_subject(
+        self, build_valid_test_result: Callable[[str, str], Bundle]
+    ) -> None:
+        bundle = build_valid_test_result("", "ods_code")
+
+        with pytest.raises(
+            ValidationError,
+            match="Composition does not define a valid subject identifier",
+        ):
+            handle_request(bundle)
+
+    def test_handle_request_with_empty_ods_code(
+        self, build_valid_test_result: Callable[[str, str], Bundle]
+    ) -> None:
+        bundle = build_valid_test_result("nhs_number_1", "")
+
+        if (
+            created_practitioner_role := bundle.get_resource(
+                url="practitioner_role", t=PractitionerRole
+            )
+        ) is None:
+            raise ValueError(
+                "Test setup error: PractitionerRole resource not found in bundle"
+            )
+
+        if (
+            expected_organisation_reference := created_practitioner_role.organization
+        ) is None:
+            raise ValueError(
+                "Test setup error: PractitionerRole resource does not define an "
+                "organization reference"
+            )
+
+        with pytest.raises(
+            ValidationError,
+            match=rf"Organization \({expected_organisation_reference.reference}\) does "
+            "not define a supported identifier. Supported system 'https://fhir.nhs.uk/Id/ods-organization-code'",
+        ):
+            handle_request(bundle)
+
     def test_handle_request_raises_error_when_create_event_fails(
         self, build_valid_test_result: Callable[[str, str], Bundle]
     ) -> None:
-        # Arrange
         bundle = build_valid_test_result("nhs_number_1", "ods_code")
 
         expected_error_message = "Failed to create bundle"

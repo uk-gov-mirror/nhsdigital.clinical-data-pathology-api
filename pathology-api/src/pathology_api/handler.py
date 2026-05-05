@@ -103,7 +103,7 @@ def _fetch_requesting_organisation(
     organisation_identifiers = [
         identifier
         for identifier in requesting_organisation.identifier
-        if isinstance(identifier, OrganizationIdentifier)
+        if isinstance(identifier, OrganizationIdentifier) and identifier.value
     ]
 
     if not organisation_identifiers:
@@ -141,7 +141,7 @@ def handle_request(bundle: Bundle) -> PdmResponse:
     _logger.debug("Requesting organization: %s", requesting_organisation)
 
     subject = composition.subject
-    if subject is None:
+    if subject is None or not subject.identifier.value:
         raise ValidationError("Composition does not define a valid subject identifier")
 
     pdm_response = post_document(bundle)

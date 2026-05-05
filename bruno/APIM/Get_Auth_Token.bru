@@ -20,15 +20,10 @@ script:pre-request {
     const jwt = require("jsonwebtoken");
     const fs = require("node:fs");
     const crypto = require("node:crypto");
-<<<<<<< Updated upstream
-    const secret = bru.getEnvVar("JWT_SECRET");
-    const privateKeyPath = bru.getEnvVar("PRIVATE_KEY_PATH");
-=======
 
     const secret = bru.getEnvVar("JWT_SECRET");
     const privateKeyPath = bru.getEnvVar("PRIVATE_KEY_PATH");
 
->>>>>>> Stashed changes
     if (!secret) {
       throw new Error("JWT_SECRET environment variable is missing.");
     }
@@ -38,10 +33,6 @@ script:pre-request {
     }
 
     const privateKey = fs.readFileSync(privateKeyPath);
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
     const payload = {
       sub: secret,
       iss: secret,
